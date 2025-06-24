@@ -6,3 +6,4 @@ python-dotenv
 Werkzeug>=2.0
 metalpriceapi
 gunicorn
+numpy
