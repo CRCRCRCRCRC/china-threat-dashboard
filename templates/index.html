@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中共攻台威脅指數儀表板</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>中共攻台威脅分析系統</h1>
+            <p>即時監測多維度指標，生成 AI 分析報告</p>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn btn-logout">登出</a>
+    </header>
+    <div class="container">
+        <main>
+            <div class="controls">
+                <button id="analyze-button">開始分析</button>
+            </div>
+
+            <div id="loading-spinner" class="hidden">
+                <div class="spinner"></div>
+                <p>正在蒐集全網公開數據、進行 AI 深度分析，請稍候... (過程約需 1-2 分鐘)</p>
+            </div>
+
+            <!-- Results Container -->
+            <div id="results-container" class="hidden">
+                
+                <div class="gauge-container card full-width">
+                     <div class="card-header">
+                        <h3>當前綜合威脅指數</h3>
+                    </div>
+                    <div class="gauge">
+                        <div class="gauge-fill" style="--gauge-angle: 0;"></div>
+                        <div class="gauge-cover">
+                            <span id="threat-percentage">0%</span>
+                        </div>
+                    </div>
+                    <p class="gauge-label">此指數根據短期軍事、經濟、外交及輿情等多維度數據的異常活動量計算而得。</p>
+                </div>
+
+                <div class="analysis-card card full-width">
+                    <div class="card-header">
+                        <h3>三個月內衝突機率評估</h3>
+                        <p>由 GPT-4o 根據綜合數據進行預測分析</p>
+                    </div>
+                    <div class="threat-pyramid">
+                        <div id="level-5" class="pyramid-layer">
+                            <span class="level-name">極度危險</span>
+                            <span class="level-range">80-100%</span>
+                        </div>
+                        <div id="level-4" class="pyramid-layer">
+                            <span class="level-name">高度危險</span>
+                            <span class="level-range">60-79%</span>
+                        </div>
+                        <div id="level-3" class="pyramid-layer">
+                            <span class="level-name">顯著警戒</span>
+                            <span class="level-range">40-59%</span>
+                        </div>
+                        <div id="level-2" class="pyramid-layer">
+                            <span class="level-name">需要關注</span>
+                            <span class="level-range">20-39%</span>
+                        </div>
+                        <div id="level-1" class="pyramid-layer">
+                            <span class="level-name">相對安全</span>
+                            <span class="level-range">0-19%</span>
+                        </div>
+                    </div>
+                    <div class="probability-percentage-note">
+                        (AI 評估機率: <span id="three-month-percentage">--</span>%)
+                    </div>
+                    <div class="justification-text">
+                        <h4>分析師論證：</h4>
+                        <p id="three-month-justification">點擊「開始分析」以生成評估報告。</p>
+                    </div>
+                </div>
+
+                <div class="grid-container">
+                    <div class="data-card card">
+                        <h4>最新擾台兵力</h4>
+                        <p id="latest-intrusions">--</p>
+                        <span>架次/艘次</span>
+                    </div>
+                    <div class="data-card card">
+                        <h4>近七天擾台總次數</h4>
+                        <p id="total-incursions-week">--</p>
+                        <span>次</span>
+                    </div>
+                    <div class="data-card card">
+                        <h4>相關新聞總數</h4>
+                        <p id="total-news-count">--</p>
+                        <span>篇</span>
+                    </div>
+                    <div class="data-card card">
+                        <h4>黃金價格</h4>
+                        <p id="gold-price">--</p>
+                        <span id="gold-change">--</span>
+                    </div>
+                    <div class="data-card card">
+                        <h4>糧食價格</h4>
+                        <p id="food-price">--</p>
+                        <span id="food-change">--</span>
+                    </div>
+                </div>
+
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3 id="report-title-zh">情報分析報告 (繁體中文)</h3>
+                    </div>
+                    <div id="report-summary-zh" class="report-section">
+                        <p>點擊「開始分析」以生成評估報告。</p>
+                    </div>
+                     <div class="card-header" style="margin-top: 20px;">
+                        <h3 id="report-title-en">Intelligence Analysis Report (English)</h3>
+                    </div>
+                    <div id="report-summary-en" class="report-section">
+                        <p>Click "Start Analysis" to generate the report.</p>
+                    </div>
+                </div>
+
+                <div class="chart-grid-single">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>共軍擾台趨勢 (近七日)</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="dailyIncursionsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card full-width">
+                    <div class="card-header">
+                        <h3>資料來源</h3>
+                    </div>
+                    <div id="data-sources-container" class="data-sources">
+                         <p>點擊「開始分析」以載入資料來源。</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>免責聲明：本系統數據來自公開網路資訊，分析結果僅供學術研究與參考，不構成任何投資或決策建議。</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
