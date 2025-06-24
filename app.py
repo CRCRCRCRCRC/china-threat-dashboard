@@ -35,7 +35,7 @@ def login():
         api_key = request.form.get('api_key')
         
         # 使用環境變數中的密碼或一個預設密碼
-        correct_password = os.getenv("APP_PASSWORD", "1234")
+        correct_password = os.getenv("APP_PASSWORD", "cn8964")
 
         if password == correct_password and api_key and api_key.startswith('sk-'):
             session['logged_in'] = True
@@ -114,5 +114,5 @@ def analyze():
 
 if __name__ == '__main__':
     # 預設密碼為 1234，您可以在 .env 檔案中設定 APP_PASSWORD 來覆寫
-    print("伺服器已啟動。預設密碼為 '1234'。")
+    print("伺服器已啟動。預設密碼為 'cn8964'。")
     app.run(debug=True, port=5001)
