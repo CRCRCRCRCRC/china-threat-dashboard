@@ -10,21 +10,27 @@
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h1>系統登入</h1>
-            <p class="login-subtitle">請輸入密碼及您的 OpenAI API 金鑰</p>
+            <h1>登入系統</h1>
+            <p class="login-subtitle">請輸入您的帳號密碼</p>
 
-            {% if error %}
-                <div class="flash-error">{{ error }}</div>
-            {% endif %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% if category == 'error' %}
+                            <div class="flash-error">{{ message }}</div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-            <form action="{{ url_for('login') }}" method="post">
+            <form method="post">
                 <div class="input-group">
-                    <label for="password">系統密碼</label>
-                    <input type="password" id="password" name="password" required>
+                    <label for="username">電子郵件</label>
+                    <input type="email" id="username" name="username" required>
                 </div>
                 <div class="input-group">
-                    <label for="api_key">OpenAI API 金鑰</label>
-                    <input type="text" id="api_key" name="api_key" required>
+                    <label for="password">密碼</label>
+                    <input type="password" id="password" name="password" required>
                 </div>
                 <button type="submit" class="btn-login">登入</button>
             </form>
