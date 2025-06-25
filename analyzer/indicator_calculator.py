@@ -89,7 +89,20 @@ class IndicatorCalculator:
             "military_score": round(military_score),
             "economic_score": round(economic_score),
             "social_sentiment_score": round(social_sentiment_score),
-            "threat_probability": round(threat_prob)
+            "threat_probability": round(threat_prob),
+
+            # --- 前端額外需要的欄位（缺資料時給 None 由前端顯示 --） ---
+            "military_latest_intrusions": raw_data.get("military", {}).get("latest_aircrafts", None),
+            "military_total_incursions_last_week": raw_data.get("military", {}).get("total_incursions_last_week", None),
+            "military_daily_chart_data": raw_data.get("military", {}).get("daily_incursions_chart_data", None),
+
+            "total_news_count": sum(len(v) for v in raw_data.get("news", {}).values() if isinstance(v, list)),
+
+            "gold_price": raw_data.get("gold", {}).get("price", None),
+            "gold_price_change": raw_data.get("gold", {}).get("price_change", None),
+
+            "food_price": raw_data.get("food", {}).get("price", None),
+            "food_price_change": raw_data.get("food", {}).get("price_change", None)
         }
         
         logging.info(f"Indicator calculation complete: {indicators}")
@@ -118,6 +131,10 @@ def calculate_threat_probability(indicators):
     
     # 確保機率在 0-100 之間
     return round(np.clip(threat_probability, 0, 100), 2)
+
+# 供其他模組或舊程式碼直接呼叫
+def calculate_indicators(raw_data):
+    return IndicatorCalculator().calculate(raw_data)
 
 if __name__ == '__main__':
     # 用於直接測試的模擬數據
