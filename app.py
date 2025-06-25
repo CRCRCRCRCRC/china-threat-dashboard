@@ -17,6 +17,7 @@ if os.environ.get('VERCEL'):
     os.environ['MPLCONFIGDIR'] = matplotlib_config_dir
 
 # --- 匯入我們的模組 ---
+# Trigger new deployment to apply the latest environment variable settings
 from scraper.news_scraper import NewsScraper
 from scraper.gold_scraper import GoldScraper
 from scraper.military_scraper import MilitaryScraper
