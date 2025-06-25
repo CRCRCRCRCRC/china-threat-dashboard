@@ -45,7 +45,7 @@ logging.basicConfig(level=logging.INFO)
 # 注意：在 Vercel 環境中，這可能會在每次函數冷啟動時運行。
 # 注意：在無伺服器環境中，這種 'in-memory' 的快取方式只對單一熱實例有效。
 # 對於需要跨實例狀態的應用，應使用 Redis 或資料庫。
-report_cache = {}
+task_cache = {}
 
 with app.app_context():
     try:
@@ -131,114 +131,83 @@ def index():
 
     return render_template('index.html', username=session.get('username'), remaining_credits=remaining_credits)
 
-def generate_report_async(task_id, indicators):
-    """在背景執行緒中生成報告的函式"""
+def run_full_analysis_async(task_id, user_email):
+    """在背景執行緒中執行完整的分析流程。"""
     with app.app_context():
         try:
-            logging.info(f"[{task_id}] Starting async report generation...")
-            report_generator = ReportGenerator()
-            report, chart_image_url = report_generator.generate_report(indicators)
-            report_cache[task_id] = {
-                'status': 'completed',
-                'report': report,
-                'chart_image_url': chart_image_url
+            # 階段 1: 爬取資料 & 計算指標
+            logging.info(f"[{task_id}] Phase 1: Scraping and Calculating Indicators...")
+            news_data = NewsScraper().scrape()
+            gold_data = GoldScraper().scrape()
+            military_data = MilitaryScraper().scrape()
+            food_data = FoodScraper().scrape()
+            
+            raw_data = {"military": military_data, "news": news_data, "gold": gold_data, "food": food_data}
+            indicators = IndicatorCalculator().calculate(raw_data)
+            sources = {
+                'military': military_data.get('source_url'),
+                'gold': gold_data.get('source_url'),
+                'food': food_data.get('source_url'),
+                'news': news_data.get('sources', {})
             }
-            logging.info(f"[{task_id}] Async report generation complete.")
+            
+            task_cache[task_id] = {'status': 'indicators_ready', 'indicators': indicators, 'sources': sources}
+            logging.info(f"[{task_id}] Phase 1 Complete. Indicators are ready.")
+
+            # 階段 2: 生成 AI 報告
+            logging.info(f"[{task_id}] Phase 2: Generating AI Report...")
+            report, chart_url = ReportGenerator().generate_report(indicators)
+            
+            # 階段 3: 扣除點數並完成
+            use_credit(user_email)
+            updated_credits = get_remaining_credits(user_email)
+            
+            task_cache[task_id] = {
+                'status': 'completed',
+                'indicators': indicators,
+                'sources': sources,
+                'report': report,
+                'chart_image_url': chart_url,
+                'updated_credits': updated_credits
+            }
+            logging.info(f"[{task_id}] Phase 2 Complete. Report generated.")
+
         except Exception as e:
-            logging.error(f"[{task_id}] Error in async report generation: {e}", exc_info=True)
-            report_cache[task_id] = {'status': 'failed', 'error': str(e)}
+            logging.error(f"[{task_id}] Error during async analysis: {e}", exc_info=True)
+            task_cache[task_id] = {'status': 'failed', 'error': str(e)}
 
 @app.route('/analyze', methods=['POST'])
-def analyze():
-    if 'user_email' not in session:
-        return jsonify({'error': '未授權的存取，請先登入。'}), 401
-
-    user_email = session['user_email']
-    
-    # 執行前檢查點數
-    try:
-        remaining_credits = get_remaining_credits(user_email)
-        if isinstance(remaining_credits, int) and remaining_credits <= 0:
-            return jsonify({'error': '您的免費分析次數已用盡。'}), 403
-    except Exception as e:
-        logging.error(f"無法檢查點數 {user_email}: {e}")
-        return jsonify({'error': '無法驗證您的帳戶狀態，請稍後再試。'}), 500
-
-    try:
-        # 1. 執行資料搜集 (快速部分)
-        logging.info("Starting data scraping...")
-        news_scraper = NewsScraper()
-        gold_scraper = GoldScraper()
-        military_scraper = MilitaryScraper()
-        food_scraper = FoodScraper()
-        
-        news_data = news_scraper.scrape()
-        gold_data = gold_scraper.scrape()
-        military_data = military_scraper.scrape()
-        food_data = food_scraper.scrape()
-        logging.info("Data scraping complete.")
-
-        # 2. 整合與計算指標 (快速部分)
-        raw_data = {"military": military_data, "news": news_data, "gold": gold_data, "food": food_data}
-        indicator_calculator = IndicatorCalculator()
-        indicators = indicator_calculator.calculate(raw_data)
-        logging.info("Indicator calculation complete.")
-
-        # 3. 啟動背景報告生成 (慢速部分)
-        task_id = str(uuid.uuid4())
-        report_cache[task_id] = {'status': 'pending'}
-        
-        thread = Thread(target=generate_report_async, args=(task_id, indicators))
-        thread.start()
-        
-        logging.info(f"Report generation task [{task_id}] started in background.")
-
-        # 4. 立即回傳指標與任務ID
-        sources = {
-            'military': military_data.get('source_url'),
-            'gold': gold_data.get('source_url'),
-            'food': food_data.get('source_url'),
-            'news': news_data.get('sources') if isinstance(news_data, dict) else {}
-        }
-        
-        return jsonify({
-            'indicators': indicators,
-            'sources': sources,
-            'task_id': task_id # 提供給前端用於輪詢
-        })
-        
-    except Exception as e:
-        logging.error(f"An error occurred during initial analysis: {e}", exc_info=True)
-        return jsonify({'error': f"分析過程中發生內部錯誤: {e}"}), 500
-
-@app.route('/get_report/<task_id>', methods=['GET'])
-def get_report(task_id):
+def analyze_start():
     if 'user_email' not in session:
         return jsonify({'error': '未授權'}), 401
 
-    task_result = report_cache.get(task_id)
+    # 檢查點數
+    if get_remaining_credits(session['user_email']) <= 0:
+        return jsonify({'error': '您的免費分析次數已用盡。'}), 403
 
-    if not task_result:
-        return jsonify({'status': 'not_found'}), 404
+    task_id = str(uuid.uuid4())
+    task_cache[task_id] = {'status': 'pending'}
+    
+    # 啟動背景執行緒
+    thread = Thread(target=run_full_analysis_async, args=(task_id, session['user_email']))
+    thread.start()
+    
+    return jsonify({'task_id': task_id})
 
-    if task_result['status'] == 'completed':
-        # 在報告成功獲取後，才扣除點數並更新
-        user_email = session['user_email']
-        use_credit(user_email)
-        updated_credits = get_remaining_credits(user_email)
-
-        # 清理快取
-        del report_cache[task_id]
+@app.route('/get_report/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    if 'user_email' not in session:
+        return jsonify({'error': '未授權'}), 401
+    
+    task_result = task_cache.get(task_id, {'status': 'not_found'})
+    
+    # 如果任務完成，從快取中移除以節省記憶體
+    if task_result.get('status') in ['completed', 'failed']:
+        # 使用 pop 但提供預設值以防競態條件
+        task_to_return = task_cache.pop(task_id, task_result)
+        return jsonify(task_to_return)
         
-        return jsonify({
-            'status': 'completed',
-            'report': task_result['report'],
-            'chart_image_url': task_result['chart_image_url'],
-            'updated_credits': updated_credits
-        })
-    else:
-        # 如果還在 'pending' 或 'failed'，直接回傳狀態
-        return jsonify(task_result)
+    return jsonify(task_result)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
