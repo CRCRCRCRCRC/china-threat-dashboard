@@ -25,6 +25,8 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in'):
+            # 使用 flash 來顯示提示訊息
+            flash('請先登入才能存取此頁面。', 'error')
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
@@ -32,6 +34,10 @@ def login_required(f):
 # --- 登入/登出路由 ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # 如果使用者已經登入，直接導向主頁
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -39,11 +45,14 @@ def login():
         # 寫死的帳號密碼
         if username == 'cn8964@8964.com' and password == 'cn8964':
             session['logged_in'] = True
-            flash('登入成功！', 'success')
-            return redirect(url_for('index'))
+            # 登入成功後，導向使用者原本想去的頁面，如果沒有就去主頁
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
         else:
             flash('帳號或密碼錯誤，請重新輸入。', 'error')
+            # 保持在登入頁面
             return redirect(url_for('login'))
+            
     return render_template('login.html')
 
 @app.route('/logout')
@@ -63,7 +72,7 @@ def index():
 @login_required
 def analyze():
     if not OPENAI_API_KEY:
-        return jsonify({"error": "伺服器未設定 OpenAI API 金鑰。"}), 500
+        return jsonify({"error": "伺服器未設定 OpenAI API 金鑰，請聯絡網站管理員。"}), 500
 
     try:
         # --- 1. 資料蒐集 ---
@@ -102,16 +111,13 @@ def analyze():
             "sources": sources
         }
         
-        print("分析完成，回傳數據給前端。")
         return jsonify(response_data)
 
     except Exception as e:
-        print(f"分析過程中發生嚴重錯誤: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'status': 'error', 'message': f"分析過程中發生嚴重錯誤: {e}"}), 500
 
 if __name__ == '__main__':
-    # 預設密碼為 1234，您可以在 .env 檔案中設定 APP_PASSWORD 來覆寫
     print("伺服器已啟動。")
     app.run(debug=True, port=5001)
