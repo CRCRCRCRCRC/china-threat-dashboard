@@ -1,123 +1,181 @@
 import os
-import json
-from flask import Flask, render_template, jsonify, request, redirect, url_for, session, flash
-from functools import wraps
+import logging
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
 
-# 匯入我們的模組
-from scraper.military_scraper import scrape_military_data
-from scraper.news_scraper import scrape_news_data
-from scraper.gold_scraper import scrape_gold_prices
-from scraper.food_scraper import scrape_food_prices
-from analyzer.indicator_calculator import calculate_indicators, calculate_threat_probability
-from analyzer.report_generator import generate_ai_report
+# --- 匯入我們的模組 ---
+from scraper.news_scraper import NewsScraper
+from scraper.gold_scraper import GoldScraper
+from scraper.military_scraper import MilitaryScraper
+from scraper.food_scraper import FoodScraper
+from analyzer.indicator_calculator import IndicatorCalculator
+from analyzer.report_generator import ReportGenerator
+from utils.db import (
+    create_user,
+    get_user,
+    check_password,
+    use_credit,
+    get_remaining_credits,
+    initialize_special_user
+)
 
+# --- 初始化 ---
 load_dotenv()
-
 app = Flask(__name__)
-# 建立一個安全的密鑰供 session 使用
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "a_very_secretive_and_secure_default_key")
-# 從環境變數讀取 OpenAI API Key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
+logging.basicConfig(level=logging.INFO)
 
-# --- 驗證裝飾器 ---
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            # 使用 flash 來顯示提示訊息
-            flash('請先登入才能存取此頁面。', 'error')
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
+# --- 資料庫與特殊使用者初始化 ---
+# 在應用程式啟動時，檢查並確保特殊使用者存在於資料庫中。
+# 注意：在 Vercel 環境中，這可能會在每次函數冷啟動時運行。
+with app.app_context():
+    try:
+        # 這會嘗試連接 Vercel KV。如果環境變數未設定 (例如在本地開發)，它會失敗。
+        initialize_special_user()
+        logging.info("Special user initialization check complete.")
+    except Exception as e:
+        logging.warning(
+            f"Could not initialize special user. This is expected if running locally "
+            f"without Vercel KV environment variables. Error: {e}"
+        )
 
-# --- 登入/登出路由 ---
+# --- 登入/註冊/登出路由 ---
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # 如果使用者已經登入，直接導向主頁
-    if session.get('logged_in'):
+    if 'user_email' in session:
         return redirect(url_for('index'))
-        
+
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        email = request.form['email']
+        password = request.form['password']
         
-        # 寫死的帳號密碼
-        if username == 'cn8964@8964.com' and password == 'cn8964':
-            session['logged_in'] = True
-            # 登入成功後，導向使用者原本想去的頁面，如果沒有就去主頁
-            next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+        user = get_user(email)
+        
+        if user and check_password(user['password_hash'], password):
+            session['user_email'] = user['email']
+            session['username'] = user['username']
+            flash('登入成功！', 'success')
+            return redirect(url_for('index'))
         else:
-            flash('帳號或密碼錯誤，請重新輸入。', 'error')
-            # 保持在登入頁面
-            return redirect(url_for('login'))
-            
+            flash('電子郵件或密碼錯誤，請重試。', 'error')
+
     return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if 'user_email' in session:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        if password != confirm_password:
+            flash('兩次輸入的密碼不一致！', 'error')
+            return redirect(url_for('register'))
+
+        if get_user(email):
+            flash('此電子郵件已經被註冊！', 'error')
+            return redirect(url_for('register'))
+
+        new_user = create_user(username, email, password)
+        if new_user:
+            flash('註冊成功，請登入！', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('註冊過程中發生錯誤，請稍後再試。', 'error')
+            return redirect(url_for('register'))
+
+    return render_template('register.html')
 
 @app.route('/logout')
 def logout():
-    session.pop('logged_in', None)
-    flash('您已成功登出。', 'info')
+    session.clear()
+    flash('您已成功登出。', 'success')
     return redirect(url_for('login'))
 
 # --- 主應用程式路由 ---
+
 @app.route('/')
-@login_required
 def index():
-    """渲染主頁面"""
-    return render_template('index.html')
+    if 'user_email' not in session:
+        return redirect(url_for('login'))
+    
+    try:
+        remaining_credits = get_remaining_credits(session['user_email'])
+    except Exception as e:
+        logging.error(f"Error getting credits for {session['user_email']}: {e}")
+        remaining_credits = "錯誤"
+
+    return render_template('index.html', username=session.get('username'), remaining_credits=remaining_credits)
 
 @app.route('/analyze', methods=['POST'])
-@login_required
 def analyze():
-    if not OPENAI_API_KEY:
-        return jsonify({"error": "伺服器未設定 OpenAI API 金鑰，請聯絡網站管理員。"}), 500
+    if 'user_email' not in session:
+        return jsonify({'error': '未授權的存取，請先登入。'}), 401
+
+    user_email = session['user_email']
+    
+    # 在執行分析前檢查點數
+    try:
+        remaining_credits = get_remaining_credits(user_email)
+        if isinstance(remaining_credits, int) and remaining_credits <= 0:
+            return jsonify({'error': '您的免費分析次數已用盡。'}), 403
+    except Exception as e:
+        logging.error(f"Could not check credits for {user_email}: {e}")
+        return jsonify({'error': '無法驗證您的帳戶狀態，請稍後再試。'}), 500
 
     try:
-        # --- 1. 資料蒐集 ---
-        military_data = scrape_military_data()
-        news_data = scrape_news_data()
-        gold_data = scrape_gold_prices()
-        food_data = scrape_food_prices()
-        
+        # 1. 實例化所有爬蟲和分析器
+        news_scraper = NewsScraper()
+        gold_scraper = GoldScraper()
+        military_scraper = MilitaryScraper()
+        food_scraper = FoodScraper()
+        indicator_calculator = IndicatorCalculator()
+        report_generator = ReportGenerator()
+
+        # 2. 執行資料搜集
+        logging.info("Starting data scraping...")
+        news_data = news_scraper.scrape()
+        gold_data = gold_scraper.scrape()
+        military_data = military_scraper.scrape()
+        food_data = food_scraper.scrape()
+        logging.info("Data scraping complete.")
+
+        # 3. 整合原始資料並計算指標
         raw_data = {
             "military": military_data,
             "news": news_data,
             "gold": gold_data,
             "food": food_data
         }
+        logging.info("Calculating indicators...")
+        indicators = indicator_calculator.calculate(raw_data)
+        logging.info("Indicator calculation complete.")
 
-        # --- 2. 指標計算 ---
-        indicators, sources = calculate_indicators(raw_data)
-        threat_probability = calculate_threat_probability(indicators)
+        # 4. 生成報告
+        logging.info("Generating report...")
+        report, chart_image_url = report_generator.generate_report(indicators)
+        logging.info("Report generation complete.")
 
-        # --- 3. AI 報告生成 ---
-        ai_report = generate_ai_report(indicators, threat_probability, sources, OPENAI_API_KEY)
-
-        # --- 4. 準備傳送到前端的資料 ---
-        response_data = {
-            "indicators": indicators,
-            "threat_probability": threat_probability,
-            "ai_report": ai_report,
-            "chart_data": {
-                "labels": ["軍事威脅", "經濟穩定", "社會輿情"],
-                "values": [
-                    indicators.get('military_score', 0),
-                    indicators.get('economic_score', 0),
-                    indicators.get('social_sentiment_score', 0)
-                ]
-            },
-            "sources": sources
-        }
+        # 5. 扣除點數
+        use_credit(user_email)
         
-        return jsonify(response_data)
+        # 取得更新後的點數
+        updated_credits = get_remaining_credits(user_email)
 
+        return jsonify({
+            'report': report,
+            'chart_image_url': chart_image_url,
+            'updated_credits': updated_credits
+        })
+        
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': f"分析過程中發生嚴重錯誤: {e}"}), 500
+        logging.error(f"An error occurred during analysis: {e}", exc_info=True)
+        return jsonify({'error': f"分析過程中發生內部錯誤: {e}"}), 500
 
 if __name__ == '__main__':
-    print("伺服器已啟動。")
     app.run(debug=True, port=5001)
