@@ -3,8 +3,14 @@ import logging
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
 
-# Set Matplotlib config directory for Vercel's writable /tmp folder
-# This must be done before any other module imports matplotlib
+# --- 環境變數與 Matplotlib 設定 ---
+
+# 僅在非 Vercel 環境 (例如本地開發) 中載入 .env 檔案
+if not os.environ.get('VERCEL'):
+    load_dotenv()
+
+# 為 Vercel 的可寫入 /tmp 資料夾設定 Matplotlib 設定目錄
+# 這必須在任何其他模組導入 matplotlib 之前完成
 if os.environ.get('VERCEL'):
     matplotlib_config_dir = '/tmp/matplotlib'
     os.makedirs(matplotlib_config_dir, exist_ok=True)
@@ -27,7 +33,6 @@ from utils.db import (
 )
 
 # --- 初始化 ---
-load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 logging.basicConfig(level=logging.INFO)
