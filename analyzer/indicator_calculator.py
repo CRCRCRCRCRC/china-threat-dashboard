@@ -1,6 +1,5 @@
 import random
 from datetime import datetime, timedelta
-import numpy as np
 import logging
 import statistics
 
@@ -8,8 +7,9 @@ def _normalize(value, max_value, high_is_bad=True):
     """將數值正規化到 0-100 的區間。"""
     if max_value == 0:
         return 0
-    # 將值限制在 0 和 max_value 之間，避免超過 100%
-    normalized_value = np.clip(value / max_value, 0, 1.0) * 100
+    # 將值限制在 0 和 1 之間
+    clipped_value = max(0, min(value / max_value, 1.0))
+    normalized_value = clipped_value * 100
     return normalized_value if high_is_bad else 100 - normalized_value
 
 class IndicatorCalculator:
@@ -159,7 +159,8 @@ def calculate_threat_probability(indicators):
     )
     
     # 確保機率在 0-100 之間
-    return round(np.clip(threat_probability, 0, 100), 2)
+    clipped_prob = max(0, min(threat_probability, 100))
+    return round(clipped_prob, 2)
 
 # 供其他模組或舊程式碼直接呼叫
 def calculate_indicators(raw_data):
