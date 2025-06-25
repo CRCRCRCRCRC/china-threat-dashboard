@@ -34,7 +34,18 @@ def get_user(email):
         r = get_redis_client()
         user_data = r.get(f"user:{email}")
         if user_data:
-            return json.loads(user_data)
+            try:
+                return json.loads(user_data)
+            except json.JSONDecodeError:
+                # Handle legacy records that stored Infinity
+                fixed = user_data.decode().replace('Infinity', '9999999')
+                try:
+                    repaired = json.loads(fixed)
+                    # Save back the repaired version for future reads
+                    r.set(f"user:{email}", json.dumps(repaired))
+                    return repaired
+                except Exception:
+                    raise
         return None
     except redis.exceptions.RedisError as e:
         print(f"Redis error in get_user: {e}")
@@ -49,7 +60,7 @@ def create_user(username, email, password):
             "username": username,
             "email": email,
             "password_hash": hashed_password,
-            "analysis_credits": DEFAULT_ANALYSIS_CREDITS if email != SPECIAL_USER_EMAIL else float('inf')
+            "analysis_credits": DEFAULT_ANALYSIS_CREDITS if email != SPECIAL_USER_EMAIL else 9999999
         }
         # Only set if key does not exist
         if r.set(f"user:{email}", json.dumps(user_data), nx=True):
@@ -70,7 +81,7 @@ def verify_user(email, password):
 def get_credits(email):
     """Gets the analysis credits for a user."""
     if email == SPECIAL_USER_EMAIL:
-        return float('inf')  # Special user has infinite credits
+        return 9999999  # Represent effectively unlimited credits with a large number
     user = get_user(email)
     return user['analysis_credits'] if user else 0
 
