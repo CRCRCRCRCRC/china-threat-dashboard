@@ -2,7 +2,7 @@ import os
 import logging
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
-from threading import Thread
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
