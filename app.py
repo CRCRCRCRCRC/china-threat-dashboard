@@ -184,7 +184,7 @@ def run_analysis_task(task_id, user_email):
             logging.info(f"[{task_id}] Phase 2: Generating AI Report...")
             tasks[task_id]['phase'] = 'report'
             
-            report, chart_url = ReportGenerator().generate_report(indicators)
+            report, chart_data = ReportGenerator().generate_report(indicators)
             
             # --- 最終化任務 ---
             use_credit(user_email)
@@ -193,7 +193,7 @@ def run_analysis_task(task_id, user_email):
             tasks[task_id].update({
                 'status': 'completed',
                 'report': report,
-                'chart_image_url': chart_url,
+                'chart_data': chart_data,
                 'updated_credits': updated_credits
             })
             logging.info(f"[{task_id}] Task complete. Report generated.")

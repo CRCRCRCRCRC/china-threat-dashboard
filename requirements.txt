@@ -6,9 +6,6 @@ python-dotenv
 Werkzeug>=2.0
 metalpriceapi
 gunicorn
-numpy
-pandas
-matplotlib
 redis
 grequests
 lxml

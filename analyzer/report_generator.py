@@ -4,10 +4,6 @@ import json
 from dotenv import load_dotenv
 from openai import OpenAI
 import logging
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-from io import BytesIO
-import base64
 
 # 載入 .env 檔案中的環境變數
 load_dotenv()
@@ -24,7 +20,7 @@ else:
 
 class ReportGenerator:
     """
-    使用 OpenAI GPT-4o 生成分析報告，並附帶一個雷達圖。
+    使用 OpenAI GPT-4o 生成分析報告。
     """
     def __init__(self):
         # 檢查並設定 OpenAI API Key
@@ -32,54 +28,10 @@ class ReportGenerator:
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set.")
         openai.api_key = self.api_key
-        
-        # 設定字體，以便 Matplotlib 可以顯示中文
-        # 注意：在 Vercel 環境中，需要確保有中文字體可用。
-        # 我們可以使用 'Noto Sans TC' 的思源黑體。
-        try:
-            # 在 Vercel 上，我們可能需要提供字體檔案。
-            # 一個常見的做法是將 .ttf 檔案包含在專案中。
-            # 為簡單起見，我們先嘗試系統字體。
-            plt.rcParams['font.sans-serif'] = ['Noto Sans TC', 'Microsoft JhengHei'] 
-            plt.rcParams['axes.unicode_minus'] = False # 解決負號顯示問題
-        except Exception as e:
-            logging.warning(f"Could not set Chinese font for Matplotlib: {e}")
-
-    def _create_radar_chart(self, indicators):
-        """
-        根據指標分數創建一個 Base64 編碼的雷達圖。
-        """
-        labels = ['軍事威脅', '經濟穩定', '社會輿情']
-        # 分數越高越好，但軍事威脅是分數越低越好，所以要反轉
-        stats = [
-            100 - indicators.get('military_score', 50), # 威脅越高，在圖上越突出
-            indicators.get('economic_score', 50),
-            indicators.get('social_sentiment_score', 50)
-        ]
-
-        angles = [n / float(len(labels)) * 2 * 3.14159 for n in range(len(labels))]
-        stats += stats[:1]
-        angles += angles[:1]
-
-        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-        ax.plot(angles, stats, color='red', linewidth=2)
-        ax.fill(angles, stats, color='red', alpha=0.25)
-        
-        ax.set_yticklabels([])
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels, size=14)
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0.1)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close(fig)
-
-        return f"data:image/png;base64,{image_base64}"
 
     def generate_report(self, indicators):
         """
-        向 OpenAI API 發送請求，生成綜合分析報告。
+        向 OpenAI API 發送請求，生成綜合分析報告，並準備圖表數據。
         """
         logging.info("Generating AI analysis report...")
         
@@ -123,11 +75,18 @@ class ReportGenerator:
             )
             report_content = response.choices[0].message.content
 
-            # 同時生成圖表
-            chart_url = self._create_radar_chart(indicators)
+            # 準備給前端 Chart.js 的數據
+            chart_data = {
+                'labels': ['軍事威脅', '經濟穩定', '社會輿情'],
+                'data': [
+                    100 - indicators.get('military_score', 50), # 分數反轉，威脅越高數值越大
+                    indicators.get('economic_score', 50),
+                    indicators.get('social_sentiment_score', 50)
+                ]
+            }
             
-            logging.info("AI report and chart generated successfully.")
-            return report_content, chart_url
+            logging.info("AI report and chart data generated successfully.")
+            return report_content, chart_data
 
         except Exception as e:
             logging.error(f"Error generating OpenAI report: {e}")

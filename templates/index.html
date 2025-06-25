@@ -67,18 +67,16 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- AI Generated Report -->
-                    <div id="ai-report-container" class="lg:col-span-2 card bg-gray-800 p-6 rounded-lg hidden">
+                    <div id="ai-report-container" class="lg:col-span-3 card bg-gray-800 p-6 rounded-lg hidden">
                         <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
-                        <div id="report-content" class="text-gray-300 space-y-4 text-sm">
-                            <!-- JS will populate this -->
+                        <div class="report-content-grid">
+                            <div class="chart-container">
+                                <canvas id="radar-chart"></canvas>
+                            </div>
+                            <div id="report-content" class="report-text">
+                                <!-- JS will populate this -->
+                            </div>
                         </div>
-                    </div>
-                    <!-- Radar Chart -->
-                    <div id="radar-chart-container" class="card bg-gray-800 p-6 rounded-lg hidden">
-                         <h4 class="text-lg font-bold text-white mb-4">威脅指標雷達圖</h4>
-                         <div id="radar-chart" class="relative" style="height: 300px;">
-                             <!-- JS will insert chart image here -->
-                         </div>
                     </div>
                 </div>
 
@@ -97,7 +95,8 @@
         </footer>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
