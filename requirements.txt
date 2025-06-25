@@ -9,5 +9,5 @@ gunicorn
 numpy
 pandas
 matplotlib
-vercel-kv
+redis
 werkzeug
