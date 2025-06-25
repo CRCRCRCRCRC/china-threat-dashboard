@@ -3,8 +3,14 @@ from vercel_kv import KV
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 
-# Instantiate the KV client
-kv = KV()
+# Instantiate the KV client by explicitly passing environment variables
+# This is more robust and avoids issues with automatic loading.
+kv = KV(
+    url=os.environ.get('KV_URL'),
+    rest_api_url=os.environ.get('KV_REST_API_URL'),
+    rest_api_token=os.environ.get('KV_REST_API_TOKEN'),
+    rest_api_read_only_token=os.environ.get('KV_REST_API_READ_ONLY_TOKEN')
+)
 
 # Define the special user's email
 SPECIAL_USER_EMAIL = "cn8964@8964.com"
