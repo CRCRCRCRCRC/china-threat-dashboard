@@ -3,6 +3,8 @@ import random
 import os
 from dotenv import load_dotenv
 from utils.price_tracker import PriceTracker
+from bs4 import BeautifulSoup
+import logging
 
 # 載入 .env 檔案中的環境變數
 load_dotenv()
@@ -10,6 +12,63 @@ load_dotenv()
 # API from api-ninjas.com
 COMMODITY_NAME = 'rough_rice'
 API_URL = f'https://api.api-ninjas.com/v1/commodityprice?name={COMMODITY_NAME}'
+
+class FoodScraper:
+    """
+    從台灣行政院農委會的「農產品批發市場交易行情站」爬取指定蔬菜的平均價格。
+    """
+    def __init__(self, timeout=15):
+        self.url = "https://www.agriharvest.tw/archives/category/observation/market-price"
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        self.timeout = timeout
+        # 我們關心的蔬菜種類
+        self.target_vegetables = ["甘藍", "結球白菜", "蘿蔔"]
+
+    def scrape(self):
+        """
+        執行爬取並回傳一個包含指定蔬菜名稱和價格的字典。
+        """
+        logging.info("Starting food price scraping from Agriharvest...")
+        try:
+            response = requests.get(self.url, headers=self.headers, timeout=self.timeout)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            prices = {}
+            # 找到包含所有價格資訊的表格
+            table = soup.find("table")
+            if not table:
+                logging.warning("Could not find the price table on Agriharvest page.")
+                return {"error": "在農產品行情網站上找不到價格表格。"}
+
+            # 遍歷表格的每一行
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) >= 2:
+                    # 第一個 cell 是品名，第二個是價格
+                    veg_name = cells[0].get_text(strip=True)
+                    price = cells[1].get_text(strip=True)
+                    
+                    for target in self.target_vegetables:
+                        if target in veg_name:
+                            prices[target] = price
+                            logging.info(f"Found price for {target}: {price}")
+                            break # 找到後就跳出內層迴圈
+            
+            if not prices:
+                logging.warning(f"Could not find any of the target vegetables: {self.target_vegetables}")
+
+            return {
+                "prices": prices,
+                "source": self.url
+            }
+
+        except requests.RequestException as e:
+            logging.error(f"Error scraping food prices: {e}")
+            return {"error": f"請求錯誤: {e}"}
 
 def get_food_price():
     api_key = os.getenv("COMMODITY_API_KEY")
@@ -116,7 +175,9 @@ def scrape_food_prices():
         }
 
 if __name__ == '__main__':
-    food_data = scrape_food_prices()
+    logging.basicConfig(level=logging.INFO)
+    scraper = FoodScraper()
+    data = scraper.scrape()
+    print("\n--- Scraped Food Price Data ---")
     import json
-    print("\n--- 抓取的糧食數據 ---")
-    print(json.dumps(food_data, indent=2)) 
+    print(json.dumps(data, indent=2, ensure_ascii=False)) 

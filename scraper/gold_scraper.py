@@ -1,76 +1,57 @@
 import os
 import requests
-import random
-from dotenv import load_dotenv
+import logging
 
-# 載入 .env 檔案中的環境變數
-load_dotenv()
-
-API_URL = "https://api.metalpriceapi.com/v1/latest"
-SOURCE_URL = "https://metalpriceapi.com/"
-
-def scrape_gold_prices():
+class GoldScraper:
     """
-    Scrapes gold prices using metalpriceapi.com API.
+    從 Metalprice API 獲取最新的黃金價格。
+    需要環境變數 METALPRICE_API_KEY。
     """
-    print("正在透過 API 抓取黃金價格...")
-    api_key = os.getenv("METALPRICEAPI_KEY")
-    if not api_key:
-        print("錯誤：找不到 METALPRICEAPI_KEY。請在 .env 檔案中設定。")
-        return {
-            "price": "N/A",
-            "price_change": "Error",
-            "source_url": SOURCE_URL,
-            "error": "API key not configured"
-        }
+    def __init__(self):
+        self.api_key = os.getenv("METALPRICE_API_KEY")
+        self.api_url = f"https://api.metalpriceapi.com/v1/latest?api_key={self.api_key}&base=USD&currencies=TWD"
 
-    params = {
-        'api_key': api_key,
-        'base': 'USD',
-        'currencies': 'XAU'
-    }
+    def scrape(self):
+        """
+        執行 API 請求並回傳黃金價格（新台幣/盎司）。
+        """
+        logging.info("Starting gold price scraping...")
+        if not self.api_key:
+            logging.error("METALPRICE_API_KEY is not set. Cannot fetch gold price.")
+            return {"error": "API金鑰未設定，無法獲取黃金價格。"}
 
-    try:
-        response = requests.get(API_URL, params=params, timeout=15)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = requests.get(self.api_url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-        if data.get("success") and 'XAU' in data.get('rates', {}):
-            # API 回傳 1 美元等於多少黃金，我們需要倒數來得到每盎司黃金的美元價格
-            price_per_ounce = 1 / data['rates']['XAU']
-            
-            # 由於我們沒有歷史數據來做真實比較，這裡我們用隨機數模擬價格變動
-            # 在一個真實的應用中，你會從數據庫或 price_tracker 獲取前一天的價格
-            price_change_percentage = round(random.uniform(-5.0, 5.0), 2)
+            if data.get("success"):
+                troy_ounce_to_gram = 31.1035
+                price_usd_per_oz = 1 / data['rates']['XAU']
+                price_twd_per_usd = data['rates']['TWD']
+                price_twd_per_oz = price_usd_per_oz * price_twd_per_usd
+                price_twd_per_gram = price_twd_per_oz / troy_ounce_to_gram
+                
+                logging.info(f"Successfully scraped gold price: TWD {price_twd_per_gram:.2f}/gram")
+                return {
+                    "price_twd_per_gram": round(price_twd_per_gram, 2),
+                    "source": "metalpriceapi.com"
+                }
+            else:
+                error_message = data.get('error', {}).get('info', '未知API錯誤')
+                logging.error(f"Metalprice API returned an error: {error_message}")
+                return {"error": f"API錯誤: {error_message}"}
 
-            print(f"抓取完成：黃金價格 ${price_per_ounce:.2f}/盎司, 24小時變動 {price_change_percentage}%")
-            
-            return {
-                "price": f"${price_per_ounce:.2f}",
-                "price_change": f"{price_change_percentage:+.2f}%",
-                "source_url": SOURCE_URL
-            }
-        else:
-            error_message = data.get("error", {}).get("info", "API 回應格式錯誤或缺少黃金匯率")
-            print(f"API 回應錯誤: {error_message}")
-            return {
-                "price": "N/A",
-                "price_change": "Error",
-                "source_url": SOURCE_URL,
-                "error": error_message
-            }
-            
-    except requests.RequestException as e:
-        print(f"透過 API 抓取黃金價格時發生錯誤: {e}")
-        return {
-            "price": "Error",
-            "price_change": "Error",
-            "source_url": SOURCE_URL,
-            "error": f"API request failed: {e}"
-        }
+        except requests.RequestException as e:
+            logging.error(f"Error scraping gold price: {e}")
+            return {"error": f"請求錯誤: {e}"}
 
 if __name__ == '__main__':
-    gold_data = scrape_gold_prices()
+    from dotenv import load_dotenv
+    load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+    scraper = GoldScraper()
+    price_data = scraper.scrape()
+    print("\n--- Scraped Gold Price Data ---")
     import json
-    print("\n--- 抓取的黃金數據 ---")
-    print(json.dumps(gold_data, indent=2, ensure_ascii=False)) 
+    print(json.dumps(price_data, indent=2, ensure_ascii=False)) 
