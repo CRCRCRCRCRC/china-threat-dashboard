@@ -40,22 +40,22 @@ def get_user(email):
         print(f"Redis error in get_user: {e}")
         return None
 
-def create_user(email, password):
-    """Creates a new user in Redis."""
+def create_user(username, email, password):
+    """Creates a new user in Redis. Compatible with legacy signature (username, email, password)."""
     try:
         r = get_redis_client()
         hashed_password = generate_password_hash(password)
         user_data = {
+            "username": username,
             "email": email,
-            "password": hashed_password,
-            "analysis_credits": DEFAULT_ANALYSIS_CREDITS
+            "password_hash": hashed_password,
+            "analysis_credits": DEFAULT_ANALYSIS_CREDITS if email != SPECIAL_USER_EMAIL else float('inf')
         }
-        # Use SET with NX=True to only set if the key does not already exist.
-        # This makes the operation atomic and prevents race conditions.
+        # Only set if key does not exist
         if r.set(f"user:{email}", json.dumps(user_data), nx=True):
             return user_data
         else:
-            return None # User already exists
+            return None  # User already exists
     except redis.exceptions.RedisError as e:
         print(f"Redis error in create_user: {e}")
         return None
@@ -63,7 +63,7 @@ def create_user(email, password):
 def verify_user(email, password):
     """Verifies a user's password."""
     user = get_user(email)
-    if user and check_password_hash(user['password'], password):
+    if user and check_password_hash(user['password_hash'], password):
         return user
     return None
 
@@ -118,9 +118,19 @@ def initialize_special_user():
         r = get_redis_client()
         user_key = f"user:{SPECIAL_USER_EMAIL}"
         if not r.exists(user_key):
-            create_user(SPECIAL_USER_EMAIL, os.environ.get("SPECIAL_USER_PASSWORD", "cn8964"))
+            create_user(SPECIAL_USER_EMAIL, SPECIAL_USER_EMAIL, os.environ.get("SPECIAL_USER_PASSWORD", "cn8964"))
             print(f"Special user {SPECIAL_USER_EMAIL} initialized.")
     except ConnectionError as e:
          print(f"WARNING: Could not initialize special user. This is expected if running locally without Vercel KV environment variables. Error: {e}")
     except redis.exceptions.RedisError as e:
-        print(f"Redis error during special user initialization: {e}") 
+        print(f"Redis error during special user initialization: {e}")
+
+# --- Compatibility helpers for existing app.py ---
+
+def check_password(stored_hash, password):
+    """Legacy helper expected by app.py; wraps werkzeug.check_password_hash."""
+    return check_password_hash(stored_hash, password)
+
+def get_remaining_credits(email):
+    """Alias to maintain compatibility with app.py."""
+    return get_credits(email) 
