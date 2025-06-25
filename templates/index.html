@@ -26,28 +26,64 @@
                 <p>正在蒐集全網公開數據、進行 AI 深度分析，請稍候... (過程約需 1-2 分鐘)</p>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- AI Generated Report -->
-                <div id="ai-report-container" class="lg:col-span-2 card bg-gray-800 p-6 rounded-lg hidden">
-                    <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
-                    <div id="report-content" class="text-gray-300 space-y-4 text-sm">
-                        <!-- JS will populate this -->
+            <div id="results-container" class="hidden">
+                <!-- Data Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                    <!-- Card: Latest Military Intrusions -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">最新擾台兵力</h4>
+                        <p id="latest-intrusions" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">架次/艘次</p>
+                    </div>
+                    <!-- Card: Total Incursions Last Week -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">近七天擾台總次數</h4>
+                        <p id="total-incursions-week" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">次</p>
+                    </div>
+                    <!-- Card: Related News Count -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">相關新聞總數</h4>
+                        <p id="total-news-count" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">篇</p>
+                    </div>
+                    <!-- Card: Gold Price -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">黃金價格</h4>
+                        <p id="gold-price" class="text-2xl font-bold text-white">--</p>
+                        <p id="gold-change" class="text-xs text-gray-500">--</p>
+                    </div>
+                    <!-- Card: Food Price -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">糧食價格</h4>
+                        <p id="food-price" class="text-2xl font-bold text-white">--</p>
+                        <p id="food-change" class="text-xs text-gray-500">--</p>
                     </div>
                 </div>
-                <!-- Radar Chart -->
-                <div id="radar-chart-container" class="card bg-gray-800 p-6 rounded-lg hidden">
-                     <h4 class="text-lg font-bold text-white mb-4">威脅指標雷達圖</h4>
-                     <div id="radar-chart" class="relative" style="height: 300px;">
-                         <!-- JS will insert chart image here -->
-                     </div>
-                </div>
-            </div>
 
-            <!-- Data Sources -->
-            <div class="card bg-gray-800 p-6 rounded-lg mt-6">
-                <h4 class="text-lg font-bold text-white mb-4">資料來源</h4>
-                <div id="data-sources-container" class="text-gray-400 text-xs break-all">
-                    <!-- JS will populate this -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- AI Generated Report -->
+                    <div id="ai-report-container" class="lg:col-span-2 card bg-gray-800 p-6 rounded-lg hidden">
+                        <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
+                        <div id="report-content" class="text-gray-300 space-y-4 text-sm">
+                            <!-- JS will populate this -->
+                        </div>
+                    </div>
+                    <!-- Radar Chart -->
+                    <div id="radar-chart-container" class="card bg-gray-800 p-6 rounded-lg hidden">
+                         <h4 class="text-lg font-bold text-white mb-4">威脅指標雷達圖</h4>
+                         <div id="radar-chart" class="relative" style="height: 300px;">
+                             <!-- JS will insert chart image here -->
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Data Sources -->
+                <div class="card bg-gray-800 p-6 rounded-lg mt-6">
+                    <h4 class="text-lg font-bold text-white mb-4">資料來源</h4>
+                    <div id="data-sources-container" class="text-gray-400 text-xs break-all">
+                        <!-- JS will populate this -->
+                    </div>
                 </div>
             </div>
         </main>
