@@ -3,9 +3,21 @@ from vercel_kv import KV
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 
-# Instantiate the KV client. 
-# It will automatically be configured from the environment variables in Vercel.
-kv = KV()
+# Global variable to hold the KV client instance. It starts as None.
+_kv_client = None
+
+def get_kv_client():
+    """
+    Initializes and returns a singleton KV client instance.
+    This lazy initialization helps in environments like Vercel
+    where environment variables might not be available at module load time.
+    """
+    global _kv_client
+    if _kv_client is None:
+        # The KV() call is now here. It will only be executed when a db 
+        # function is first used, at which point the app is fully loaded.
+        _kv_client = KV()
+    return _kv_client
 
 # Define the special user's email
 SPECIAL_USER_EMAIL = "cn8964@8964.com"
@@ -13,6 +25,7 @@ DEFAULT_ANALYSIS_CREDITS = 10
 
 def get_user(email):
     """Fetches a user's data from Vercel KV by email."""
+    kv = get_kv_client()
     user_data_json = kv.get(f"user:{email}")
     if user_data_json:
         return json.loads(user_data_json)
@@ -20,7 +33,8 @@ def get_user(email):
 
 def create_user(username, email, password):
     """Creates a new user in Vercel KV."""
-    if get_user(email):
+    kv = get_kv_client()
+    if get_user(email): # get_user will also call get_kv_client, which is fine
         return None  # User already exists
 
     hashed_password = generate_password_hash(password)
@@ -46,6 +60,7 @@ def check_password(user_password_hash, password):
 
 def get_remaining_credits(email):
     """Gets the remaining analysis credits for a user."""
+    kv = get_kv_client() # Although get_user is called, it's cleaner to be explicit
     user_data = get_user(email)
     if not user_data:
         return 0
@@ -57,6 +72,7 @@ def get_remaining_credits(email):
 
 def use_credit(email):
     """Decrements the analysis credit for a user."""
+    kv = get_kv_client()
     # Special user has unlimited credits, so no need to decrement
     if email == SPECIAL_USER_EMAIL:
         return True
@@ -78,6 +94,7 @@ def use_credit(email):
 # For example, to be run from a separate script or the first time the app starts
 def initialize_special_user():
     """Ensures the special user exists in the database."""
+    kv = get_kv_client()
     if not get_user(SPECIAL_USER_EMAIL):
         print(f"Creating special user: {SPECIAL_USER_EMAIL}")
         # The password for the special user is 'cn8964' as per previous context
@@ -87,9 +104,5 @@ def initialize_special_user():
             password="cn8964" # This should be a securely handled password
         )
 
-# When this module is imported, we can ensure the special user is created.
-# However, running this on every import in a serverless function can be inefficient.
-# It's better to run initialization as a separate step during deployment.
-# For simplicity in this context, we will call it once.
-# A better approach for production would be a CLI command `flask init-db`.
-# initialize_special_user() 
+# We remove any automatic calls to initialize_special_user() from the module level.
+# It should be run manually or via a dedicated deployment script. 
