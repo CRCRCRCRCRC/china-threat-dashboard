@@ -2,6 +2,7 @@ import logging
 import os
 from gnews import GNews
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class NewsScraper:
     """
@@ -16,33 +17,46 @@ class NewsScraper:
             "public_opinion": '"台灣民意調查" AND ("統一" OR "獨立" OR "兩岸關係" OR "國防信心")'
         }
 
+    def _fetch_category(self, category, query):
+        """Fetches news for a single category."""
+        logging.info(f"Fetching news for category: {category}")
+        try:
+            articles = self.gnews.get_news(query)
+            if articles:
+                logging.info(f"Found {len(articles)} articles for category '{category}'.")
+                return category, articles
+            else:
+                logging.warning(f"No news found for category '{category}', using fallback.")
+                return category, self._get_fallback_data(category)
+        except Exception as e:
+            # This is often due to network issues or being blocked by the provider.
+            logging.error(f"Error fetching GNews for category '{category}': {e}")
+            return category, self._get_fallback_data(category)
+
     def scrape(self):
         """
-        Scrapes news for all defined categories and compiles the results.
+        Scrapes news for all defined categories concurrently and compiles the results.
         """
-        logging.info("Starting news scraping from GNews...")
+        logging.info("Starting concurrent news scraping from GNews...")
         all_news = {}
         total_articles = 0
         all_sources = {}
 
-        for category, query in self.categories.items():
-            logging.info(f"Fetching news for category: {category}")
-            try:
-                articles = self.gnews.get_news(query)
-                if articles:
-                    all_news[category] = articles
+        with ThreadPoolExecutor(max_workers=len(self.categories)) as executor:
+            future_to_category = {executor.submit(self._fetch_category, category, query): category for category, query in self.categories.items()}
+            
+            for future in as_completed(future_to_category):
+                category, articles = future.result()
+                all_news[category] = articles
+                
+                # Exclude fallback data from total count and source collection
+                if not (len(articles) == 1 and articles[0]['url'] == '#'):
                     total_articles += len(articles)
                     for article in articles:
-                        all_sources[article['publisher']['title']] = article['publisher']['href']
-                    logging.info(f"Found {len(articles)} articles for category '{category}'.")
-                else:
-                    logging.warning(f"No news found for category '{category}', using fallback data.")
-                    all_news[category] = self._get_fallback_data(category)
-            except Exception as e:
-                logging.error(f"Error fetching GNews for category '{category}': {e}", exc_info=True)
-                all_news[category] = self._get_fallback_data(category)
-        
-        logging.info(f"News scraping complete. Total articles found: {total_articles}")
+                        if article.get('publisher') and isinstance(article['publisher'], dict):
+                            all_sources[article['publisher']['title']] = article['publisher']['href']
+
+        logging.info(f"News scraping complete. Total valid articles found: {total_articles}")
         
         return {
             "total_news_count": total_articles,
