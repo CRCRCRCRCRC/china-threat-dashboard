@@ -45,7 +45,7 @@ class IndicatorCalculator:
         """計算經濟穩定分數"""
         score = 100
         # 新聞影響
-        economic_news = news_data.get("economic_news", [])
+        economic_news = news_data.get("news_by_category", {}).get("economic", [])
         score -= len(economic_news) * 5 # 每則負面經濟新聞扣5分
 
         # 黃金價格影響
@@ -74,11 +74,11 @@ class IndicatorCalculator:
         """計算社會輿情分數"""
         score = 100
         # 外交新聞影響
-        diplomatic_news = news_data.get("diplomatic_news", [])
+        diplomatic_news = news_data.get("news_by_category", {}).get("diplomatic", [])
         score -= len(diplomatic_news) * 4 # 每則負面外交新聞扣4分
 
         # 社會輿情新聞影響
-        public_opinion_news = news_data.get("public_opinion_news", [])
+        public_opinion_news = news_data.get("news_by_category", {}).get("public_opinion", [])
         score -= len(public_opinion_news) * 6 # 每則負面輿情新聞扣6分
 
         return max(score, 0)
@@ -125,7 +125,7 @@ class IndicatorCalculator:
             "military_total_incursions_last_week": raw_data.get("military", {}).get("total_incursions_last_week"),
             "military_daily_chart_data": raw_data.get("military", {}).get("daily_incursions_chart_data"),
 
-            "total_news_count": sum(len(v) for k, v in raw_data.get("news", {}).items() if isinstance(v, list) and k.endswith('_news')),
+            "total_news_count": raw_data.get("news", {}).get("total_news_count", 0),
 
             "gold_price": raw_data.get("gold", {}).get("price"),
             "gold_price_change": raw_data.get("gold", {}).get("price_change"),
@@ -171,6 +171,7 @@ if __name__ == '__main__':
         "military": {
             "latest_aircrafts": 25,
             "latest_ships": 10,
+            "total_incursions_last_week": 85,
             "daily_incursions_chart_data": {
                 "labels": ["07-01", "07-02", "07-03"],
                 "data": [10, 20, 35]
@@ -188,13 +189,15 @@ if __name__ == '__main__':
             "source_url": "https://api-ninjas.com/api/commodityprice"
         },
         "news": {
-            "economic_news": ["北京宣布對台部分產品啟動貿易壁壘調查"],
-            "diplomatic_news": ["美國重申對台承諾", "某國關閉駐台辦事處"],
-            "public_opinion_news": ["最新民調顯示兩岸關係態度分歧"],
+            "total_news_count": 4,
+            "news_by_category": {
+                "economic": [{'title': '北京宣布對台部分產品啟動貿易壁壘調查', 'url': '#'}],
+                "diplomatic": [{'title': '美國重申對台承諾', 'url': '#'}, {'title': '某國關閉駐台辦事處', 'url': '#'}],
+                "public_opinion": [{'title': '最新民調顯示兩岸關係態度分歧', 'url': '#'}]
+            },
             "sources": {
-                "economic": ["http://news.google.com/1"],
-                "diplomatic": ["http://news.google.com/2", "http://news.google.com/3"],
-                "public_opinion": ["http://news.google.com/4"],
+                "中央社": "https://www.cna.com.tw",
+                "聯合新聞網": "https://udn.com"
             }
         }
     }

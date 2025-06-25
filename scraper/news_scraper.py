@@ -1,85 +1,69 @@
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import quote_plus, urljoin
 import logging
+import os
+from gnews import GNews
+from datetime import datetime, timedelta
 
 class NewsScraper:
     """
-    從 Google 新聞爬取與台灣相關的經濟、外交和輿情新聞。
+    A scraper for fetching news articles related to Taiwan from Google News.
     """
-    def __init__(self, timeout=15):
-        self.base_url = "https://news.google.com"
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    def __init__(self):
+        self.gnews = GNews(language='zh-Hant', country='TW', period='7d')
+        self.categories = {
+            "military": '("共機" OR "共艦" OR "擾台" OR "國防部" OR "台灣軍事") AND ("演習" OR "威脅" OR "動態")',
+            "economic": '("台灣經濟" OR "台股") AND ("中國影響" OR "貿易戰" OR "供應鏈")',
+            "diplomatic": '"台灣外交" AND ("美國" OR "中國" OR "國際空間" OR "邦交國")',
+            "public_opinion": '"台灣民意調查" AND ("統一" OR "獨立" OR "兩岸關係" OR "國防信心")'
         }
-        self.timeout = timeout
-        self.news_keywords = {
-            "economic": ["台灣 中國 經濟制裁", "台灣 出口禁令", "ECFA"],
-            "diplomatic": ["台灣 外交聲明", "美國 台灣關係法", "中國 軍事威脅 譴責"],
-            "public_opinion": ["台灣民意調查 統一", "台灣 國防信心", "台灣社會輿論 兩岸"]
-        }
-
-    def _search(self, query):
-        """輔助函式，用於搜尋特定關鍵字的 Google 新聞。"""
-        formatted_query = quote_plus(query)
-        search_url = f"{self.base_url}/search?q={formatted_query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-        
-        try:
-            response = requests.get(search_url, headers=self.headers, timeout=self.timeout)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            articles = []
-            for article_div in soup.find_all('div', {'class': 'SoaBEf'}, limit=5):
-                link_tag = article_div.find('a', href=True)
-                title_tag = article_div.find('h3') # Google's structure may use h3 now
-                if not title_tag:
-                     title_tag = article_div.find('div', {'role': 'heading'})
-
-                if link_tag and title_tag:
-                    title = title_tag.get_text(strip=True)
-                    relative_url = link_tag['href'].lstrip('.')
-                    url = urljoin(self.base_url, relative_url)
-                    articles.append({"title": title, "url": url})
-            return articles
-
-        except requests.RequestException as e:
-            logging.error(f"Error searching Google News for '{query}': {e}")
-            return []
 
     def scrape(self):
         """
-        執行所有類別的新聞爬取並回傳結構化資料。
+        Scrapes news for all defined categories and compiles the results.
         """
-        logging.info("Starting news scraping from Google News...")
-        
+        logging.info("Starting news scraping from GNews...")
         all_news = {}
+        total_articles = 0
         all_sources = {}
 
-        for category, keywords in self.news_keywords.items():
-            query = " OR ".join(keywords)
-            articles = self._search(query)
-            
-            all_news[category] = [article["title"] for article in articles]
-            all_sources[category] = [article["url"] for article in articles]
-
-            if not all_news[category]:
-                logging.warning(f"No news found for category '{category}', using fallback data.")
-                all_news[category] = [f"無法獲取相關新聞（{category}）"]
-                all_sources[category] = [self.base_url]
-
-        logging.info("News scraping complete.")
+        for category, query in self.categories.items():
+            logging.info(f"Fetching news for category: {category}")
+            try:
+                articles = self.gnews.get_news(query)
+                if articles:
+                    all_news[category] = articles
+                    total_articles += len(articles)
+                    for article in articles:
+                        all_sources[article['publisher']['title']] = article['publisher']['href']
+                    logging.info(f"Found {len(articles)} articles for category '{category}'.")
+                else:
+                    logging.warning(f"No news found for category '{category}', using fallback data.")
+                    all_news[category] = self._get_fallback_data(category)
+            except Exception as e:
+                logging.error(f"Error fetching GNews for category '{category}': {e}", exc_info=True)
+                all_news[category] = self._get_fallback_data(category)
+        
+        logging.info(f"News scraping complete. Total articles found: {total_articles}")
+        
         return {
-            "economic_news": all_news.get("economic", []),
-            "diplomatic_news": all_news.get("diplomatic", []),
-            "public_opinion_news": all_news.get("public_opinion", []),
+            "total_news_count": total_articles,
+            "news_by_category": all_news,
             "sources": all_sources
         }
+
+    def _get_fallback_data(self, category):
+        """Provides fallback data for a given category when scraping fails."""
+        logging.warning(f"Using fallback data for news category: {category}")
+        return [{
+            'title': f'無法載入「{category}」類別新聞',
+            'description': '由於網路連線或來源網站問題，暫時無法取得即時新聞。',
+            'published date': (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S"),
+            'url': '#',
+            'publisher': {'title': '系統訊息', 'href': '#'}
+        }]
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     scraper = NewsScraper()
-    data = scraper.scrape()
-    print("\n--- Scraped News Data ---")
+    results = scraper.scrape()
     import json
-    print(json.dumps(data, indent=2, ensure_ascii=False))
+    print(json.dumps(results, indent=2, ensure_ascii=False))

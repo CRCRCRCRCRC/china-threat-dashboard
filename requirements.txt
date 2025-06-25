@@ -10,4 +10,6 @@ numpy
 pandas
 matplotlib
 redis
-werkzeug
+grequests
+lxml
+gnews

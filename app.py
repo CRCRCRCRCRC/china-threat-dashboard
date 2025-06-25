@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from dotenv import load_dotenv
 from threading import Thread
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # --- 環境變數與 Matplotlib 設定 ---
 
@@ -45,7 +46,7 @@ logging.basicConfig(level=logging.INFO)
 # 注意：在 Vercel 環境中，這可能會在每次函數冷啟動時運行。
 # 注意：在無伺服器環境中，這種 'in-memory' 的快取方式只對單一熱實例有效。
 # 對於需要跨實例狀態的應用，應使用 Redis 或資料庫。
-task_cache = {}
+tasks = {}
 
 with app.app_context():
     try:
@@ -131,80 +132,106 @@ def index():
 
     return render_template('index.html', username=session.get('username'), remaining_credits=remaining_credits)
 
-def run_full_analysis_async(task_id, user_email):
-    """在背景執行緒中執行完整的分析流程。"""
+def run_analysis_task(task_id, user_email):
+    """
+    在背景執行緒中執行完整的分析流程，使用並行處理來加速爬蟲。
+    """
     with app.app_context():
         try:
-            # 階段 1: 爬取資料 & 計算指標
             logging.info(f"[{task_id}] Phase 1: Scraping and Calculating Indicators...")
-            news_data = NewsScraper().scrape()
-            gold_data = GoldScraper().scrape()
-            military_data = MilitaryScraper().scrape()
-            food_data = FoodScraper().scrape()
-            
-            raw_data = {"military": military_data, "news": news_data, "gold": gold_data, "food": food_data}
-            indicators = IndicatorCalculator().calculate(raw_data)
-            sources = {
-                'military': military_data.get('source_url'),
-                'gold': gold_data.get('source_url'),
-                'food': food_data.get('source_url'),
-                'news': news_data.get('sources', {})
+            tasks[task_id]['status'] = 'processing'
+            tasks[task_id]['phase'] = 'indicators'
+
+            # --- 並行執行所有爬蟲 ---
+            scrapers = {
+                'military': MilitaryScraper(),
+                'gold': GoldScraper(),
+                'food': FoodScraper(),
+                'news': NewsScraper()
             }
             
-            task_cache[task_id] = {'status': 'indicators_ready', 'indicators': indicators, 'sources': sources}
-            logging.info(f"[{task_id}] Phase 1 Complete. Indicators are ready.")
+            scraped_data = {}
+            with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
+                future_to_scraper = {executor.submit(s.scrape): name for name, s in scrapers.items()}
+                for future in as_completed(future_to_scraper):
+                    scraper_name = future_to_scraper[future]
+                    try:
+                        data = future.get()
+                        scraped_data[scraper_name] = data
+                    except Exception as exc:
+                        logging.error(f"Scraper '{scraper_name}' generated an exception: {exc}")
+                        scraped_data[scraper_name] = {} # 使用空字典作為後備
 
-            # 階段 2: 生成 AI 報告
+            # --- 計算指標 ---
+            raw_data = {
+                "military": scraped_data.get('military', {}),
+                "news": scraped_data.get('news', {}),
+                "gold": scraped_data.get('gold', {}),
+                "food": scraped_data.get('food', {})
+            }
+            indicators = IndicatorCalculator().calculate(raw_data)
+            sources = {
+                'military': scraped_data.get('military', {}).get('source_url'),
+                'gold': scraped_data.get('gold', {}).get('source_url'),
+                'food': scraped_data.get('food', {}).get('source_url'),
+                'news': scraped_data.get('news', {}).get('sources', {})
+            }
+            tasks[task_id]['indicators'] = indicators
+            tasks[task_id]['sources'] = sources
+            logging.info(f"[{task_id}] Phase 1 complete. Indicators calculated.")
+            
+            # --- 生成 AI 報告 ---
             logging.info(f"[{task_id}] Phase 2: Generating AI Report...")
+            tasks[task_id]['phase'] = 'report'
+            
             report, chart_url = ReportGenerator().generate_report(indicators)
             
-            # 階段 3: 扣除點數並完成
+            # --- 最終化任務 ---
             use_credit(user_email)
             updated_credits = get_remaining_credits(user_email)
-            
-            task_cache[task_id] = {
+
+            tasks[task_id].update({
                 'status': 'completed',
-                'indicators': indicators,
-                'sources': sources,
                 'report': report,
                 'chart_image_url': chart_url,
                 'updated_credits': updated_credits
-            }
-            logging.info(f"[{task_id}] Phase 2 Complete. Report generated.")
+            })
+            logging.info(f"[{task_id}] Task complete. Report generated.")
 
         except Exception as e:
-            logging.error(f"[{task_id}] Error during async analysis: {e}", exc_info=True)
-            task_cache[task_id] = {'status': 'failed', 'error': str(e)}
+            logging.error(f"Error during analysis task {task_id}: {e}", exc_info=True)
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['report'] = f"報告生成失敗：{e}"
 
 @app.route('/analyze', methods=['POST'])
-def analyze_start():
+def analyze():
     if 'user_email' not in session:
         return jsonify({'error': '未授權'}), 401
-
-    # 檢查點數
-    if get_remaining_credits(session['user_email']) <= 0:
-        return jsonify({'error': '您的免費分析次數已用盡。'}), 403
+    
+    user_email = session['user_email']
+    remaining_credits = get_remaining_credits(user_email)
+    if remaining_credits <= 0:
+        return jsonify({'error': '點數不足，請儲值'}), 403
 
     task_id = str(uuid.uuid4())
-    task_cache[task_id] = {'status': 'pending'}
+    tasks[task_id] = {'status': 'pending', 'task_id': task_id}
     
     # 啟動背景執行緒
-    thread = Thread(target=run_full_analysis_async, args=(task_id, session['user_email']))
-    thread.start()
+    background_thread = threading.Thread(target=run_analysis_task, args=(task_id, user_email))
+    background_thread.start()
     
-    return jsonify({'task_id': task_id})
+    return jsonify({"task_id": task_id})
 
 @app.route('/get_report/<task_id>', methods=['GET'])
-def get_task_status(task_id):
+def get_report(task_id):
     if 'user_email' not in session:
         return jsonify({'error': '未授權'}), 401
     
-    task_result = task_cache.get(task_id, {'status': 'not_found'})
+    task_result = tasks.get(task_id, {'status': 'not_found'})
     
-    # 如果任務完成，從快取中移除以節省記憶體
+    # 如果任務完成或失敗，從記憶體中移除
     if task_result.get('status') in ['completed', 'failed']:
-        # 使用 pop 但提供預設值以防競態條件
-        task_to_return = task_cache.pop(task_id, task_result)
+        task_to_return = tasks.pop(task_id, task_result)
         return jsonify(task_to_return)
         
     return jsonify(task_result)
