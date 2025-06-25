@@ -180,8 +180,29 @@ def analyze():
         # 取得更新後的點數
         updated_credits = get_remaining_credits(user_email)
 
+        # 整理前端需要的結構
+        ai_report_obj = {
+            # 臨時結構：將威脅機率放入 three_month_probability，避免前端讀取錯誤
+            'three_month_probability': {
+                'percentage': indicators.get('threat_probability', 0),
+                'justification': '（報告內文可查看詳細分析）'
+            },
+            # 提供原始文字報告，前端可後續改版使用
+            'raw_markdown': report
+        }
+
+        sources = {
+            'military': military_data.get('source_url'),
+            'gold': gold_data.get('source_url'),
+            'food': food_data.get('source_url'),
+            'news': news_data.get('sources') if isinstance(news_data, dict) else {}
+        }
+
         return jsonify({
-            'report': report,
+            'threat_probability': indicators.get('threat_probability', 0),
+            'ai_report': ai_report_obj,
+            'indicators': indicators,
+            'sources': sources,
             'chart_image_url': chart_image_url,
             'updated_credits': updated_credits
         })
