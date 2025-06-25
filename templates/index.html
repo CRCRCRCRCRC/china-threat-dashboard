@@ -26,119 +26,28 @@
                 <p>正在蒐集全網公開數據、進行 AI 深度分析，請稍候... (過程約需 1-2 分鐘)</p>
             </div>
 
-            <!-- Results Container -->
-            <div id="results-container" class="hidden">
-                
-                <div class="gauge-container card full-width">
-                     <div class="card-header">
-                        <h3>當前綜合威脅指數</h3>
-                    </div>
-                    <div class="gauge">
-                        <div class="gauge-fill" style="--gauge-angle: 0;"></div>
-                        <div class="gauge-cover">
-                            <span id="threat-percentage">0%</span>
-                        </div>
-                    </div>
-                    <p class="gauge-label">此指數根據短期軍事、經濟、外交及輿情等多維度數據的異常活動量計算而得。</p>
-                </div>
-
-                <div class="analysis-card card full-width">
-                    <div class="card-header">
-                        <h3>三個月內衝突機率評估</h3>
-                        <p>由 GPT-4o 根據綜合數據進行預測分析</p>
-                    </div>
-                    <div class="threat-pyramid">
-                        <div id="level-5" class="pyramid-layer">
-                            <span class="level-name">極度危險</span>
-                            <span class="level-range">80-100%</span>
-                        </div>
-                        <div id="level-4" class="pyramid-layer">
-                            <span class="level-name">高度危險</span>
-                            <span class="level-range">60-79%</span>
-                        </div>
-                        <div id="level-3" class="pyramid-layer">
-                            <span class="level-name">顯著警戒</span>
-                            <span class="level-range">40-59%</span>
-                        </div>
-                        <div id="level-2" class="pyramid-layer">
-                            <span class="level-name">需要關注</span>
-                            <span class="level-range">20-39%</span>
-                        </div>
-                        <div id="level-1" class="pyramid-layer">
-                            <span class="level-name">相對安全</span>
-                            <span class="level-range">0-19%</span>
-                        </div>
-                    </div>
-                    <div class="probability-percentage-note">
-                        (AI 評估機率: <span id="three-month-percentage">--</span>%)
-                    </div>
-                    <div class="justification-text">
-                        <h4>分析師論證：</h4>
-                        <p id="three-month-justification">點擊「開始分析」以生成評估報告。</p>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- AI Generated Report -->
+                <div id="ai-report-container" class="lg:col-span-2 card bg-gray-800 p-6 rounded-lg hidden">
+                    <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
+                    <div id="report-content" class="text-gray-300 space-y-4 text-sm">
+                        <!-- JS will populate this -->
                     </div>
                 </div>
-
-                <div class="grid-container">
-                    <div class="data-card card">
-                        <h4>最新擾台兵力</h4>
-                        <p id="latest-intrusions">--</p>
-                        <span>架次/艘次</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>近七天擾台總次數</h4>
-                        <p id="total-incursions-week">--</p>
-                        <span>次</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>相關新聞總數</h4>
-                        <p id="total-news-count">--</p>
-                        <span>篇</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>黃金價格</h4>
-                        <p id="gold-price">--</p>
-                        <span id="gold-change">--</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>糧食價格</h4>
-                        <p id="food-price">--</p>
-                        <span id="food-change">--</span>
-                    </div>
+                <!-- Radar Chart -->
+                <div id="radar-chart-container" class="card bg-gray-800 p-6 rounded-lg hidden">
+                     <h4 class="text-lg font-bold text-white mb-4">威脅指標雷達圖</h4>
+                     <div id="radar-chart" class="relative" style="height: 300px;">
+                         <!-- JS will insert chart image here -->
+                     </div>
                 </div>
+            </div>
 
-                <div class="card full-width">
-                    <div class="card-header">
-                        <h3 id="report-title-zh">情報分析報告 (繁體中文)</h3>
-                    </div>
-                    <div id="report-summary-zh" class="report-section">
-                        <p>點擊「開始分析」以生成評估報告。</p>
-                    </div>
-                     <div class="card-header" style="margin-top: 20px;">
-                        <h3 id="report-title-en">Intelligence Analysis Report (English)</h3>
-                    </div>
-                    <div id="report-summary-en" class="report-section">
-                        <p>Click "Start Analysis" to generate the report.</p>
-                    </div>
-                </div>
-
-                <div class="chart-grid-single">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>共軍擾台趨勢 (近七日)</h3>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="dailyIncursionsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card full-width">
-                    <div class="card-header">
-                        <h3>資料來源</h3>
-                    </div>
-                    <div id="data-sources-container" class="data-sources">
-                         <p>點擊「開始分析」以載入資料來源。</p>
-                    </div>
+            <!-- Data Sources -->
+            <div class="card bg-gray-800 p-6 rounded-lg mt-6">
+                <h4 class="text-lg font-bold text-white mb-4">資料來源</h4>
+                <div id="data-sources-container" class="text-gray-400 text-xs break-all">
+                    <!-- JS will populate this -->
                 </div>
             </div>
         </main>

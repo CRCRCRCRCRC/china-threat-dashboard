@@ -2,6 +2,8 @@ import os
 import logging
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
+from threading import Thread
+import uuid
 
 # --- 環境變數與 Matplotlib 設定 ---
 
@@ -41,6 +43,10 @@ logging.basicConfig(level=logging.INFO)
 # --- 資料庫與特殊使用者初始化 ---
 # 在應用程式啟動時，檢查並確保特殊使用者存在於資料庫中。
 # 注意：在 Vercel 環境中，這可能會在每次函數冷啟動時運行。
+# 注意：在無伺服器環境中，這種 'in-memory' 的快取方式只對單一熱實例有效。
+# 對於需要跨實例狀態的應用，應使用 Redis 或資料庫。
+report_cache = {}
+
 with app.app_context():
     try:
         # 這會嘗試連接 Vercel KV。如果環境變數未設定 (例如在本地開發)，它會失敗。
@@ -125,6 +131,23 @@ def index():
 
     return render_template('index.html', username=session.get('username'), remaining_credits=remaining_credits)
 
+def generate_report_async(task_id, indicators):
+    """在背景執行緒中生成報告的函式"""
+    with app.app_context():
+        try:
+            logging.info(f"[{task_id}] Starting async report generation...")
+            report_generator = ReportGenerator()
+            report, chart_image_url = report_generator.generate_report(indicators)
+            report_cache[task_id] = {
+                'status': 'completed',
+                'report': report,
+                'chart_image_url': chart_image_url
+            }
+            logging.info(f"[{task_id}] Async report generation complete.")
+        except Exception as e:
+            logging.error(f"[{task_id}] Error in async report generation: {e}", exc_info=True)
+            report_cache[task_id] = {'status': 'failed', 'error': str(e)}
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     if 'user_email' not in session:
@@ -132,84 +155,90 @@ def analyze():
 
     user_email = session['user_email']
     
-    # 在執行分析前檢查點數
+    # 執行前檢查點數
     try:
         remaining_credits = get_remaining_credits(user_email)
         if isinstance(remaining_credits, int) and remaining_credits <= 0:
             return jsonify({'error': '您的免費分析次數已用盡。'}), 403
     except Exception as e:
-        logging.error(f"Could not check credits for {user_email}: {e}")
+        logging.error(f"無法檢查點數 {user_email}: {e}")
         return jsonify({'error': '無法驗證您的帳戶狀態，請稍後再試。'}), 500
 
     try:
-        # 1. 實例化所有爬蟲和分析器
+        # 1. 執行資料搜集 (快速部分)
+        logging.info("Starting data scraping...")
         news_scraper = NewsScraper()
         gold_scraper = GoldScraper()
         military_scraper = MilitaryScraper()
         food_scraper = FoodScraper()
-        indicator_calculator = IndicatorCalculator()
-        report_generator = ReportGenerator()
-
-        # 2. 執行資料搜集
-        logging.info("Starting data scraping...")
+        
         news_data = news_scraper.scrape()
         gold_data = gold_scraper.scrape()
         military_data = military_scraper.scrape()
         food_data = food_scraper.scrape()
         logging.info("Data scraping complete.")
 
-        # 3. 整合原始資料並計算指標
-        raw_data = {
-            "military": military_data,
-            "news": news_data,
-            "gold": gold_data,
-            "food": food_data
-        }
-        logging.info("Calculating indicators...")
+        # 2. 整合與計算指標 (快速部分)
+        raw_data = {"military": military_data, "news": news_data, "gold": gold_data, "food": food_data}
+        indicator_calculator = IndicatorCalculator()
         indicators = indicator_calculator.calculate(raw_data)
         logging.info("Indicator calculation complete.")
 
-        # 4. 生成報告
-        logging.info("Generating report...")
-        report, chart_image_url = report_generator.generate_report(indicators)
-        logging.info("Report generation complete.")
-
-        # 5. 扣除點數
-        use_credit(user_email)
+        # 3. 啟動背景報告生成 (慢速部分)
+        task_id = str(uuid.uuid4())
+        report_cache[task_id] = {'status': 'pending'}
         
-        # 取得更新後的點數
-        updated_credits = get_remaining_credits(user_email)
+        thread = Thread(target=generate_report_async, args=(task_id, indicators))
+        thread.start()
+        
+        logging.info(f"Report generation task [{task_id}] started in background.")
 
-        # 整理前端需要的結構
-        ai_report_obj = {
-            # 臨時結構：將威脅機率放入 three_month_probability，避免前端讀取錯誤
-            'three_month_probability': {
-                'percentage': indicators.get('threat_probability', 0),
-                'justification': '（報告內文可查看詳細分析）'
-            },
-            # 提供原始文字報告，前端可後續改版使用
-            'raw_markdown': report
-        }
-
+        # 4. 立即回傳指標與任務ID
         sources = {
             'military': military_data.get('source_url'),
             'gold': gold_data.get('source_url'),
             'food': food_data.get('source_url'),
             'news': news_data.get('sources') if isinstance(news_data, dict) else {}
         }
-
+        
         return jsonify({
-            'threat_probability': indicators.get('threat_probability', 0),
-            'ai_report': ai_report_obj,
             'indicators': indicators,
             'sources': sources,
-            'chart_image_url': chart_image_url,
-            'updated_credits': updated_credits
+            'task_id': task_id # 提供給前端用於輪詢
         })
         
     except Exception as e:
-        logging.error(f"An error occurred during analysis: {e}", exc_info=True)
+        logging.error(f"An error occurred during initial analysis: {e}", exc_info=True)
         return jsonify({'error': f"分析過程中發生內部錯誤: {e}"}), 500
+
+@app.route('/get_report/<task_id>', methods=['GET'])
+def get_report(task_id):
+    if 'user_email' not in session:
+        return jsonify({'error': '未授權'}), 401
+
+    task_result = report_cache.get(task_id)
+
+    if not task_result:
+        return jsonify({'status': 'not_found'}), 404
+
+    if task_result['status'] == 'completed':
+        # 在報告成功獲取後，才扣除點數並更新
+        user_email = session['user_email']
+        use_credit(user_email)
+        updated_credits = get_remaining_credits(user_email)
+
+        # 清理快取
+        del report_cache[task_id]
+        
+        return jsonify({
+            'status': 'completed',
+            'report': task_result['report'],
+            'chart_image_url': task_result['chart_image_url'],
+            'updated_credits': updated_credits
+        })
+    else:
+        # 如果還在 'pending' 或 'failed'，直接回傳狀態
+        return jsonify(task_result)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
