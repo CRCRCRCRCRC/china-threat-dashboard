@@ -1,7 +1,10 @@
 import os
-from vercel_kv import kv
+from vercel_kv import KV
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
+
+# Instantiate the KV client
+kv = KV()
 
 # Define the special user's email
 SPECIAL_USER_EMAIL = "cn8964@8964.com"

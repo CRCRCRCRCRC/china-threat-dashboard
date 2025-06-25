@@ -3,6 +3,13 @@ import logging
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from dotenv import load_dotenv
 
+# Set Matplotlib config directory for Vercel's writable /tmp folder
+# This must be done before any other module imports matplotlib
+if os.environ.get('VERCEL'):
+    matplotlib_config_dir = '/tmp/matplotlib'
+    os.makedirs(matplotlib_config_dir, exist_ok=True)
+    os.environ['MPLCONFIGDIR'] = matplotlib_config_dir
+
 # --- 匯入我們的模組 ---
 from scraper.news_scraper import NewsScraper
 from scraper.gold_scraper import GoldScraper
