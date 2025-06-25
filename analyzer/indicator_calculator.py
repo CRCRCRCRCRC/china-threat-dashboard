@@ -18,18 +18,28 @@ class IndicatorCalculator:
     """
     def _calculate_military_score(self, military_data):
         """計算軍事威脅分數"""
-        headlines = military_data.get("headlines", [])
-        if not headlines or "error" in military_data:
-            return 0
+        if "error" in military_data or not military_data:
+            logging.warning("Military data contains error or is empty, returning low threat score.")
+            return 10 # 如果資料有誤，給一個較低的固定分數
+
+        # 分數基於多個因素，總分100
+        # 1. 最近一周總侵擾次數 (權重最高)
+        #    假設一周超過 100 架次/艘次為極高風險
+        total_incursions = military_data.get("total_incursions_last_week", 0)
+        incursion_score = _normalize(total_incursions, 100) # 100次為滿分100
+
+        # 2. 最新單日侵擾強度
+        #    假設單日超過 30 架次/艘次為極高風險
+        latest_aircrafts = military_data.get("latest_aircrafts", 0)
+        latest_ships = military_data.get("latest_ships", 0)
+        latest_total = latest_aircrafts + latest_ships
+        latest_incursion_score = _normalize(latest_total, 30) # 30次為滿分100
+
+        # 組合分數 (範例：70% 總數, 30% 最新強度)
+        final_score = (incursion_score * 0.7) + (latest_incursion_score * 0.3)
         
-        score = len(headlines) * 15  # 每則動態計15分
-        # 可以根據關鍵字進一步加權，例如 "共機", "繞台"
-        for headline in headlines:
-            if "共機" in headline or "共艦" in headline:
-                score += 5
-            if "飛越" in headline or "中線" in headline:
-                score += 10
-        return min(score, 100)
+        logging.info(f"Calculated military score: {final_score:.2f} (from total incursions: {total_incursions}, latest: {latest_total})")
+        return min(final_score, 100)
 
     def _calculate_economic_score(self, news_data, gold_data, food_data):
         """計算經濟穩定分數"""
@@ -38,16 +48,26 @@ class IndicatorCalculator:
         economic_news = news_data.get("economic_news", [])
         score -= len(economic_news) * 5 # 每則負面經濟新聞扣5分
 
-        # 黃金價格影響 (假設價格為 TWD/gram)
-        gold_price = gold_data.get("price_twd_per_gram", 0)
-        if gold_price > 2500: # 假設超過2500台幣/克為高價
-            score -= (gold_price - 2500) / 50 # 每高出50元扣1分
-            
-        # 糧食價格影響
-        food_prices = food_data.get("prices", {})
-        if not food_prices:
-             score -= 10 # 如果無法獲取糧價，視為不穩定
+        # 黃金價格影響
+        # 假設價格變動超過 +/- 5% 就開始影響分數
+        gold_price_change_str = gold_data.get("price_change", "0%")
+        try:
+            gold_change = float(gold_price_change_str.strip('%'))
+            if abs(gold_change) > 5:
+                score -= (abs(gold_change) - 5) * 2 # 波動每多1%扣2分
+        except (ValueError, TypeError):
+            logging.warning(f"Could not parse gold price change: {gold_price_change_str}")
 
+        # 糧食價格影響
+        # 假設價格變動超過 +/- 10% 就開始影響分數
+        food_price_change_str = food_data.get("price_change", "0%")
+        try:
+            food_change = float(food_price_change_str.strip('%'))
+            if abs(food_change) > 10:
+                score -= (abs(food_change) - 10) # 波動每多1%扣1分
+        except (ValueError, TypeError):
+            logging.warning(f"Could not parse food price change: {food_price_change_str}")
+        
         return max(score, 0)
 
     def _calculate_social_sentiment_score(self, news_data):
@@ -85,24 +105,33 @@ class IndicatorCalculator:
                         (100 - economic_score) * 0.3 +
                         (100 - social_sentiment_score) * 0.2 )
         
+        # --- 前端額外需要的欄位（缺資料時給 None 由前端顯示 --） ---
+        latest_aircrafts = raw_data.get("military", {}).get("latest_aircrafts")
+        latest_ships = raw_data.get("military", {}).get("latest_ships")
+        
+        if latest_aircrafts is not None and latest_ships is not None:
+            military_latest_intrusions = f"{latest_aircrafts} 架次 / {latest_ships} 艘次"
+        else:
+            military_latest_intrusions = None
+
         indicators = {
             "military_score": round(military_score),
             "economic_score": round(economic_score),
             "social_sentiment_score": round(social_sentiment_score),
             "threat_probability": round(threat_prob),
 
-            # --- 前端額外需要的欄位（缺資料時給 None 由前端顯示 --） ---
-            "military_latest_intrusions": raw_data.get("military", {}).get("latest_aircrafts", None),
-            "military_total_incursions_last_week": raw_data.get("military", {}).get("total_incursions_last_week", None),
-            "military_daily_chart_data": raw_data.get("military", {}).get("daily_incursions_chart_data", None),
+            # --- 前端額外需要的欄位 ---
+            "military_latest_intrusions": military_latest_intrusions,
+            "military_total_incursions_last_week": raw_data.get("military", {}).get("total_incursions_last_week"),
+            "military_daily_chart_data": raw_data.get("military", {}).get("daily_incursions_chart_data"),
 
-            "total_news_count": sum(len(v) for v in raw_data.get("news", {}).values() if isinstance(v, list)),
+            "total_news_count": sum(len(v) for k, v in raw_data.get("news", {}).items() if isinstance(v, list) and k.endswith('_news')),
 
-            "gold_price": raw_data.get("gold", {}).get("price", None),
-            "gold_price_change": raw_data.get("gold", {}).get("price_change", None),
+            "gold_price": raw_data.get("gold", {}).get("price"),
+            "gold_price_change": raw_data.get("gold", {}).get("price_change"),
 
-            "food_price": raw_data.get("food", {}).get("price", None),
-            "food_price_change": raw_data.get("food", {}).get("price_change", None)
+            "food_price": raw_data.get("food", {}).get("price"),
+            "food_price_change": raw_data.get("food", {}).get("price_change")
         }
         
         logging.info(f"Indicator calculation complete: {indicators}")
@@ -170,12 +199,10 @@ if __name__ == '__main__':
         }
     }
     
-    calculated_indicators, calculated_sources = calculate_indicators(mock_raw_data)
+    calculated_indicators = calculate_indicators(mock_raw_data)
     threat_prob = calculate_threat_probability(calculated_indicators)
     
     import json
     print("--- Calculated Indicators ---")
     print(json.dumps(calculated_indicators, indent=2, ensure_ascii=False))
-    print("\n--- Calculated Sources ---")
-    print(json.dumps(calculated_sources, indent=2, ensure_ascii=False))
     print(f"\nCalculated Threat Probability: {threat_prob}%")
