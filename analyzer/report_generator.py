@@ -3,6 +3,10 @@ import openai
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
+<<<<<<< HEAD
+=======
+import logging
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
 
 # 載入 .env 檔案中的環境變數
 load_dotenv()
@@ -17,6 +21,83 @@ if not api_key:
 else:
     client = openai.OpenAI(api_key=api_key)
 
+<<<<<<< HEAD
+=======
+class ReportGenerator:
+    """
+    使用 OpenAI GPT-4o 生成分析報告。
+    """
+    def __init__(self):
+        # 檢查並設定 OpenAI API Key
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set.")
+        openai.api_key = self.api_key
+
+    def generate_report(self, indicators):
+        """
+        向 OpenAI API 發送請求，生成綜合分析報告，並準備圖表數據。
+        """
+        logging.info("Generating AI analysis report...")
+        
+        threat_level = "低"
+        prob = indicators.get('threat_probability', 0)
+        if prob > 70:
+            threat_level = "高"
+        elif prob > 40:
+            threat_level = "中"
+            
+        system_prompt = f"""
+        你是一位頂尖的軍事安全與國情分析師，專精於分析台灣海峽的緊張局勢。你的任務是根據我提供的量化指標，生成一份專業、客觀、精煉的綜合分析報告。
+
+        報告需包含以下部分：
+        1.  **總體評估**：基於總體威脅機率，用一句話明確指出當前的綜合威脅等級（高、中、低）。
+        2.  **指標分析**：
+            *   **軍事動態**：根據軍事威脅分數，解讀當前解放軍活動的強度。分數越低代表軍事活動越少，局勢越穩定。
+            *   **經濟穩定**：根據經濟穩定分數，評估台灣的經濟韌性。分數越高代表經濟越穩定。
+            *   **社會輿情**：根據社會輿情分數，分析台灣內部的穩定性與民心士氣。分數越高代表社會越穩定。
+        3.  **潛在風險與建議**：根據分數最低的維度，指出當前最主要的風險領域，並提供簡短的觀察或建議。
+        4.  **格式要求**：請使用 Markdown 格式，重點部分使用粗體。用詞需專業、中立。
+        """
+        
+        user_prompt = f"""
+        請根據以下最新指標數據生成分析報告：
+        - **軍事威脅分數**：{indicators.get('military_score', 'N/A')} / 100 (分數越低越安全)
+        - **經濟穩定分數**：{indicators.get('economic_score', 'N/A')} / 100 (分數越高越穩定)
+        - **社會輿情分數**：{indicators.get('social_sentiment_score', 'N/A')} / 100 (分數越高越穩定)
+        - **綜合威脅機率**：{prob}% (機率越高，威脅越大)
+        """
+
+        try:
+            response = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.5,
+                max_tokens=800
+            )
+            report_content = response.choices[0].message.content
+
+            # 準備給前端 Chart.js 的數據
+            chart_data = {
+                'labels': ['軍事威脅', '經濟穩定', '社會輿情'],
+                'data': [
+                    100 - indicators.get('military_score', 50), # 分數反轉，威脅越高數值越大
+                    indicators.get('economic_score', 50),
+                    indicators.get('social_sentiment_score', 50)
+                ]
+            }
+            
+            logging.info("AI report and chart data generated successfully.")
+            return report_content, chart_data
+
+        except Exception as e:
+            logging.error(f"Error generating OpenAI report: {e}")
+            return f"生成AI報告時發生錯誤: {e}", None
+
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
 def _format_sources(sources):
     """將來源字典格式化為易於閱讀的字串。"""
     lines = []

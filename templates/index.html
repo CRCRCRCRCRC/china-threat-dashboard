@@ -14,6 +14,14 @@
             <h1>TAIWAN STRAIT DEFENSE MATRIX</h1>
             <p>REAL-TIME PLA ACTIVITY MONITORING & THREAT ASSESSMENT</p>
         </div>
+<<<<<<< HEAD
+=======
+        <div class="user-info">
+            <span>你好，{{ username }}</span>
+            <span>剩餘點數：<span id="user-credits">{{ remaining_credits }}</span></span>
+            <a href="{{ url_for('logout') }}" class="btn btn-logout">登出</a>
+        </div>
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
     </header>
     <div class="container">
         <main>
@@ -26,20 +34,30 @@
                 <p>SCANNING PLA ACTIVITIES & CROSS-STRAIT INTELLIGENCE... AI ANALYSIS IN PROGRESS... (1-2 MINUTES)</p>
             </div>
 
-            <!-- Results Container -->
             <div id="results-container" class="hidden">
+<<<<<<< HEAD
                 
                 <div class="gauge-container card full-width">
                      <div class="card-header">
                         <h3>CURRENT THREAT LEVEL</h3>
                         <p>HOLOGRAPHIC THREAT ASSESSMENT MATRIX</p>
+=======
+                <!-- Data Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                    <!-- Card: Latest Military Intrusions -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">最新擾台兵力</h4>
+                        <p id="latest-intrusions" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">架次/艘次</p>
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
                     </div>
-                    <div class="gauge">
-                        <div class="gauge-fill" style="--gauge-angle: 0;"></div>
-                        <div class="gauge-cover">
-                            <span id="threat-percentage">0%</span>
-                        </div>
+                    <!-- Card: Total Incursions Last Week -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">近七天擾台總次數</h4>
+                        <p id="total-incursions-week" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">次</p>
                     </div>
+<<<<<<< HEAD
                     <p class="gauge-label">PLA THREAT INDEX BASED ON CROSS-STRAIT MILITARY ACTIVITIES, ECONOMIC INDICATORS & INTELLIGENCE PATTERNS</p>
                 </div>
 
@@ -130,10 +148,44 @@
                         </div>
                         <div class="chart-container">
                             <canvas id="dailyIncursionsChart"></canvas>
+=======
+                    <!-- Card: Related News Count -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">相關新聞總數</h4>
+                        <p id="total-news-count" class="text-2xl font-bold text-white">--</p>
+                        <p class="text-xs text-gray-500">篇</p>
+                    </div>
+                    <!-- Card: Gold Price -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">黃金價格</h4>
+                        <p id="gold-price" class="text-2xl font-bold text-white">--</p>
+                        <p id="gold-change" class="text-xs text-gray-500">--</p>
+                    </div>
+                    <!-- Card: Food Price -->
+                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">糧食價格</h4>
+                        <p id="food-price" class="text-2xl font-bold text-white">--</p>
+                        <p id="food-change" class="text-xs text-gray-500">--</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- AI Generated Report -->
+                    <div id="ai-report-container" class="lg:col-span-3 card bg-gray-800 p-6 rounded-lg hidden">
+                        <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
+                        <div class="report-content-grid">
+                            <div class="chart-container">
+                                <canvas id="radar-chart"></canvas>
+                            </div>
+                            <div id="report-content" class="report-text">
+                                <!-- JS will populate this -->
+                            </div>
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
                         </div>
                     </div>
                 </div>
 
+<<<<<<< HEAD
                 <div class="card full-width">
                     <div class="card-header">
                         <h3>DATA SOURCE MATRIX</h3>
@@ -141,6 +193,13 @@
                     </div>
                     <div id="data-sources-container" class="data-sources">
                          <p>CLICK "INITIATE SCAN" TO LOAD DATA SOURCES.</p>
+=======
+                <!-- Data Sources -->
+                <div class="card bg-gray-800 p-6 rounded-lg mt-6">
+                    <h4 class="text-lg font-bold text-white mb-4">資料來源</h4>
+                    <div id="data-sources-container" class="text-gray-400 text-xs break-all">
+                        <!-- JS will populate this -->
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
                     </div>
                 </div>
             </div>
@@ -151,9 +210,14 @@
         </footer>
     </div>
 
+<<<<<<< HEAD
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/percentage-fix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cyber-effects.js') }}"></script>
+=======
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+>>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
