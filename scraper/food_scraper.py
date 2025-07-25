@@ -1,183 +1,177 @@
 import requests
-import random
-import os
-from dotenv import load_dotenv
-from utils.price_tracker import PriceTracker
-from bs4 import BeautifulSoup
-import logging
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any
 
-# 載入 .env 檔案中的環境變數
-load_dotenv()
-
-# API from api-ninjas.com
-COMMODITY_NAME = 'rough_rice'
-API_URL = f'https://api.api-ninjas.com/v1/commodityprice?name={COMMODITY_NAME}'
-
-class FoodScraper:
+def scrape_food_prices_yahoo() -> Dict[str, Any]:
     """
-    從台灣行政院農委會的「農產品批發市場交易行情站」爬取指定蔬菜的平均價格。
+    使用 Yahoo Finance API 爬取糧食價格 (小麥期貨)
     """
-    def __init__(self, timeout=15):
-        self.url = "https://www.agriharvest.tw/archives/category/observation/market-price"
-        self.headers = {
+    print("正在透過 Yahoo Finance API 抓取小麥價格...")
+    
+    try:
+        # 使用小麥期貨 (ZW=F) 作為糧食指標
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/ZW=F"
+        
+        headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        self.timeout = timeout
-        # 我們關心的蔬菜種類
-        self.target_vegetables = ["甘藍", "結球白菜", "蘿蔔"]
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
+            result = data['chart']['result'][0]
+            meta = result['meta']
+            
+            current_price = meta.get('regularMarketPrice', 0)
+            prev_close = meta.get('previousClose', 0)
+            
+            if current_price and prev_close:
+                change = current_price - prev_close
+                change_percent = (change / prev_close) * 100
+                
+                # 小麥期貨價格通常以美分/蒲式耳計價
+                price_display = f"${current_price:.2f} / bushel"
+                change_display = f"{change_percent:+.2f}%"
+                
+                print(f"抓取完成：小麥價格 {price_display}, 24小時變動 {change_display}")
+                
+                return {
+                    "price": price_display,
+                    "price_change": change_display,
+                    "sources": {"economic": ["https://finance.yahoo.com/"]}
+                }
+            else:
+                raise ValueError("無法獲取有效的價格數據")
+        else:
+            raise ValueError("API 回應格式異常")
+            
+    except Exception as e:
+        print(f"Yahoo Finance API 錯誤: {e}")
+        raise
 
-    def scrape(self):
-        """
-        執行爬取並回傳一個包含指定蔬菜名稱和價格的字典。
-        """
-        logging.info("Starting food price scraping from Agriharvest...")
+def scrape_food_prices_fmp() -> Dict[str, Any]:
+    """
+    使用 Financial Modeling Prep API 爬取農產品期貨
+    """
+    print("正在透過 Financial Modeling Prep API 抓取小麥價格...")
+    
+    try:
+        # 小麥期貨
+        url = "https://financialmodelingprep.com/api/v3/quote/ZW"
+        
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data and len(data) > 0:
+            quote = data[0]
+            price = quote.get('price', 0)
+            
+            if price:
+                change_percent = quote.get('changesPercentage', 0)
+                
+                price_display = f"${price:.2f} / bushel"
+                change_display = f"{change_percent:+.2f}%"
+                
+                print(f"抓取完成：小麥價格 {price_display}, 24小時變動 {change_display}")
+                
+                return {
+                    "price": price_display,
+                    "price_change": change_display,
+                    "sources": {"economic": ["https://financialmodelingprep.com/"]}
+                }
+            else:
+                raise ValueError("無法獲取有效的價格數據")
+        else:
+            raise ValueError("API 回應為空")
+            
+    except Exception as e:
+        print(f"Financial Modeling Prep API 錯誤: {e}")
+        raise
+
+def scrape_food_prices_worldbank() -> Dict[str, Any]:
+    """
+    使用世界銀行 API 爬取糧食價格指數
+    """
+    print("正在透過世界銀行 API 抓取糧食價格指數...")
+    
+    try:
+        # 世界銀行糧食價格指數
+        current_year = datetime.now().year
+        url = f"https://api.worldbank.org/v2/country/WLD/indicator/PFANRPUSDM"
+        
+        params = {
+            'format': 'json',
+            'date': f'{current_year-1}:{current_year}',  # 最近兩年數據
+            'per_page': 10
+        }
+        
+        response = requests.get(url, params=params, timeout=15)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if len(data) > 1 and data[1]:  # 世界銀行 API 格式：[metadata, data]
+            latest_data = data[1][0] if data[1] else None
+            
+            if latest_data and latest_data.get('value'):
+                price = latest_data['value']
+                
+                # 計算變動（需要更多數據點來計算）
+                change_percent = 0.0
+                if len(data[1]) > 1:
+                    prev_value = data[1][1].get('value')
+                    if prev_value:
+                        change_percent = ((price - prev_value) / prev_value) * 100
+                
+                price_display = f"${price:.2f} (Index)"
+                change_display = f"{change_percent:+.2f}%"
+                
+                print(f"抓取完成：糧食價格指數 {price_display}, 年度變動 {change_display}")
+                
+                return {
+                    "price": price_display,
+                    "price_change": change_display,
+                    "sources": {"economic": ["https://data.worldbank.org/"]}
+                }
+            else:
+                raise ValueError("無法獲取有效的價格數據")
+        else:
+            raise ValueError("API 回應為空")
+            
+    except Exception as e:
+        print(f"世界銀行 API 錯誤: {e}")
+        raise
+
+def scrape_food_prices() -> Dict[str, Any]:
+    """
+    主要糧食價格爬取函數，使用多個免費 API 作為備援
+    """
+    apis = [
+        ("Yahoo Finance (小麥期貨)", scrape_food_prices_yahoo),
+        ("Financial Modeling Prep (小麥期貨)", scrape_food_prices_fmp),
+        ("世界銀行 (糧食價格指數)", scrape_food_prices_worldbank)
+    ]
+    
+    for api_name, api_func in apis:
         try:
-            response = requests.get(self.url, headers=self.headers, timeout=self.timeout)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            prices = {}
-            # 找到包含所有價格資訊的表格
-            table = soup.find("table")
-            if not table:
-                logging.warning("Could not find the price table on Agriharvest page.")
-                return {"error": "在農產品行情網站上找不到價格表格。"}
-
-            # 遍歷表格的每一行
-            rows = table.find_all("tr")
-            for row in rows:
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    # 第一個 cell 是品名，第二個是價格
-                    veg_name = cells[0].get_text(strip=True)
-                    price = cells[1].get_text(strip=True)
-                    
-                    for target in self.target_vegetables:
-                        if target in veg_name:
-                            prices[target] = price
-                            logging.info(f"Found price for {target}: {price}")
-                            break # 找到後就跳出內層迴圈
-            
-            if not prices:
-                logging.warning(f"Could not find any of the target vegetables: {self.target_vegetables}")
-
-            return {
-                "prices": prices,
-                "source": self.url
-            }
-
-        except requests.RequestException as e:
-            logging.error(f"Error scraping food prices: {e}")
-            return {"error": f"請求錯誤: {e}"}
-
-def get_food_price():
-    api_key = os.getenv("COMMODITY_API_KEY")
-    if not api_key:
-        return {
-            'price': 'N/A', 
-            'change_value': 0, 
-            'source': 'API-Ninjas (金鑰未設定)'
-        }
-
-    url = 'https://api.api-ninjas.com/v1/commodityprice?name=rice'
-    headers = {'X-Api-Key': api_key}
+            print(f"嘗試使用 {api_name}...")
+            return api_func()
+        except Exception as e:
+            print(f"{api_name} 失敗: {e}")
+            continue
     
-    price_tracker = PriceTracker()
-
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-
-        if isinstance(data, list) and data:
-            current_price = data[0]['price']
-
-            last_price = price_tracker.get_last_price('rice')
-            change_value = 0
-            
-            if last_price is not None:
-                change_value = current_price - last_price
-
-            price_tracker.update_price('rice', current_price)
-            
-            return {
-                'price': current_price,
-                'change_value': change_value,
-                'source': 'api-ninjas.com'
-            }
-        else:
-            return {
-                'price': 'N/A', 
-                'change_value': 0, 
-                'source': 'api-ninjas.com (API 回應格式錯誤)'
-            }
-
-    except requests.exceptions.RequestException as e:
-        return {
-            'price': 'N/A', 
-            'change_value': 0, 
-            'source': f'api-ninjas.com (請求失敗: {e})'
-        }
-
-def scrape_food_prices():
-    """
-    Scrapes rough rice futures prices using api-ninjas.com API.
-    """
-    print("正在透過 API 抓取糧食價格...")
-    
-    api_key = os.getenv("COMMODITY_API_KEY")
-    if not api_key:
-        print("錯誤：找不到 COMMODITY_API_KEY。請在 .env 檔案中設定。")
-        return {
-            "price": "N/A",
-            "price_change": "Error",
-            "source_url": "https://api-ninjas.com/api/commodityprice",
-            "error": "API key not configured"
-        }
-        
-    try:
-        response = requests.get(API_URL, headers={'X-Api-Key': api_key}, timeout=15)
-        response.raise_for_status()
-        data = response.json()
-
-        if not data:
-            raise ValueError("API回傳空的資料")
-
-        # 根據日誌錯誤，API可能回傳dict，但為了穩健性，也處理list的情況
-        price = 'N/A'
-        if isinstance(data, list) and len(data) > 0:
-            # 如果是清單，取第一個項目
-            price = data[0].get('price', 'N/A')
-        elif isinstance(data, dict):
-            # 如果是字典，直接取值
-            price = data.get('price', 'N/A')
-        else:
-            # 如果格式無法識別，也視為 N/A
-            print(f"警告：API回傳了無法識別的資料格式: {type(data)}")
-
-        price_change_percentage = round(random.uniform(-5.0, 5.0), 2)
-
-        print(f"抓取完成：稻米期貨價格 {price}, 24小時變動 {price_change_percentage}%")
-        
-        return {
-            "price": f"${price}", 
-            "price_change": f"{price_change_percentage:+.2f}%", 
-            "source_url": "https://api-ninjas.com/api/commodityprice"
-        }
-
-    except requests.RequestException as e:
-        print(f"透過 API 抓取糧食價格時發生錯誤: {e}")
-        return {
-            "price": "Error", 
-            "price_change": "Error", 
-            "source_url": "https://api-ninjas.com/api/commodityprice", 
-            "error": f"API request failed: {e}"
-        }
+    # 所有 API 都失敗
+    print("❌ 所有糧食價格 API 都失敗，無法獲取真實數據")
+    raise Exception("無法從任何 API 獲取糧食價格數據")
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    scraper = FoodScraper()
-    data = scraper.scrape()
-    print("\n--- Scraped Food Price Data ---")
+    food_data = scrape_food_prices()
     import json
-    print(json.dumps(data, indent=2, ensure_ascii=False)) 
+    print("\n--- 抓取的糧食數據 ---")
+    print(json.dumps(food_data, indent=2)) 

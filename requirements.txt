@@ -4,10 +4,4 @@ beautifulsoup4
 openai
 python-dotenv
 Werkzeug>=2.0
-metalpriceapi
 gunicorn
-numpy
-pandas
-matplotlib
-redis
-werkzeug

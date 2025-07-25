@@ -172,27 +172,49 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateDataSources(sources) {
         const container = document.getElementById('data-sources-container');
         if (!container) return;
-        container.innerHTML = '';
-        if (!sources) return;
+        container.innerHTML = ''; // Clear previous content
+        if (!sources || Object.keys(sources).length === 0) {
+            container.innerHTML = '<p>無可用數據來源。</p>';
+            return;
+        }
 
         const list = document.createElement('ul');
+        list.className = 'sources-list';
 
-        const createLink = (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+        const categoryMap = {
+            military: '軍事動態',
+            economic: '經濟數據',
+            diplomatic: '外交情資',
+            public_opinion: '社會輿情'
+        };
 
-        const militarySource = sources.military ? `<li><strong>軍事動態:</strong> ${createLink(sources.military)}</li>` : '';
-        const goldSource = sources.gold ? `<li><strong>黃金價格:</strong> ${createLink(sources.gold)}</li>` : '';
-        const foodSource = sources.food ? `<li><strong>糧食價格:</strong> ${createLink(sources.food)}</li>` : '';
-        
-        let newsSourceItems = '';
-        if (sources.news && Object.keys(sources.news).length > 0) {
-            for (const [category, urls] of Object.entries(sources.news)) {
-                if(urls && urls.length > 0){
-                    newsSourceItems += `<li><strong>新聞 (${category}):</strong> ${urls.map(createLink).join(', ')}</li>`;
-                }
+        // Sort keys to maintain a consistent order
+        const sortedCategories = Object.keys(sources).sort((a, b) => {
+            const order = ['military', 'economic', 'diplomatic', 'public_opinion'];
+            return order.indexOf(a) - order.indexOf(b);
+        });
+
+        for (const category of sortedCategories) {
+            const urls = sources[category];
+            if (urls && urls.length > 0) {
+                const displayName = categoryMap[category] || category.charAt(0).toUpperCase() + category.slice(1);
+                
+                const uniqueUrls = [...new Set(urls)]; // Remove duplicates
+
+                const linksHtml = uniqueUrls.map(url => {
+                    try {
+                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${new URL(url).hostname}</a>`;
+                    } catch (e) {
+                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+                    }
+                }).join(', ');
+
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `<strong>${displayName}:</strong> ${linksHtml}`;
+                list.appendChild(listItem);
             }
         }
         
-        list.innerHTML = `${militarySource}${goldSource}${foodSource}${newsSourceItems}`;
         container.appendChild(list);
     }
 
