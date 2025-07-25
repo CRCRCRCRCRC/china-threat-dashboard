@@ -5,10 +5,7 @@ openai
 python-dotenv
 Werkzeug>=2.0
 gunicorn
-<<<<<<< HEAD
-=======
 redis
 grequests
 lxml
 gnews
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
