@@ -1,9 +1,11 @@
 import os
 import json
-from flask import Flask, render_template, jsonify, request
-from dotenv import load_dotenv
+import logging
 import threading
 import uuid
+from datetime import datetime
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, flash
+from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 匯入我們的模組
@@ -17,10 +19,6 @@ from analyzer.report_generator import generate_ai_report
 load_dotenv()
 
 app = Flask(__name__)
-<<<<<<< HEAD
-# 不再需要 session，可以移除 secret_key
-# app.secret_key = os.getenv("FLASK_SECRET_KEY", "a_very_secretive_and_secure_default_key")
-=======
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 logging.basicConfig(level=logging.INFO)
 
@@ -33,55 +31,55 @@ tasks = {}
 
 with app.app_context():
     try:
-        # 這會嘗試連接 Vercel KV。如果環境變數未設定 (例如在本地開發)，它會失敗。
-        initialize_special_user()
-        logging.info("Special user initialization check complete.")
-    except Exception as e:
-        logging.warning(
-            f"Could not initialize special user. This is expected if running locally "
-            f"without Vercel KV environment variables. Error: {e}"
-        )
+        # 嘗試導入資料庫相關的功能
+        from utils.db_helper import (init_db, create_user, verify_user, 
+                                   get_remaining_credits, deduct_credits, add_credits)
+        init_db()
+        
+        # 創建預設管理員帳戶
+        default_admin_email = "admin@example.com"
+        default_admin_password = "admin123"
+        create_user("admin", default_admin_email, default_admin_password)
+        add_credits(default_admin_email, 10)  # 給管理員 10 點初始點數
+        
+        logging.info("資料庫和預設使用者初始化完成")
+    except ImportError:
+        logging.warning("資料庫模組未找到，應用程式將在無認證模式下運行")
+        # 定義空函數以避免錯誤
+        def verify_user(email, password): return None
+        def get_remaining_credits(email): return float('inf')
+        def deduct_credits(email, amount): pass
+        def create_user(username, email, password): return True
+        def add_credits(email, amount): pass
 
-# --- 登入/註冊/登出路由 ---
-
+# --- 使用者認證路由 ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'user_email' in session:
-        return redirect(url_for('index'))
-
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         
-        user = get_user(email)
-        
-        if user and check_password(user['password_hash'], password):
-            session['user_email'] = user['email']
-            session['username'] = user['username']
+        user = verify_user(email, password)
+        if user:
+            session['user_email'] = email
             flash('登入成功！', 'success')
             return redirect(url_for('index'))
         else:
-            flash('電子郵件或密碼錯誤，請重試。', 'error')
-
+            flash('電子郵件或密碼錯誤。', 'error')
+            return redirect(url_for('login'))
+    
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if 'user_email' in session:
-        return redirect(url_for('index'))
-
     if request.method == 'POST':
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
-        confirm_password = request.form['confirm_password']
-
-        if password != confirm_password:
-            flash('兩次輸入的密碼不一致！', 'error')
-            return redirect(url_for('register'))
-
-        if get_user(email):
-            flash('此電子郵件已經被註冊！', 'error')
+        
+        # 簡單驗證
+        if len(password) < 6:
+            flash('密碼至少需要6個字符。', 'error')
             return redirect(url_for('register'))
 
         new_user = create_user(username, email, password)
@@ -99,7 +97,6 @@ def logout():
     session.clear()
     flash('您已成功登出。', 'success')
     return redirect(url_for('login'))
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
 
 # --- 主應用程式路由 ---
 @app.route('/')
@@ -118,60 +115,61 @@ def run_analysis_task(task_id, user_email):
             tasks[task_id]['phase'] = 'indicators'
 
             # --- 並行執行所有爬蟲 ---
-            scrapers = {
-                'military': MilitaryScraper(),
-                'gold': GoldScraper(),
-                'food': FoodScraper(),
-                'news': NewsScraper()
-            }
-            
-            scraped_data = {}
-            with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
-                future_to_scraper = {executor.submit(s.scrape): name for name, s in scrapers.items()}
-                for future in as_completed(future_to_scraper):
-                    scraper_name = future_to_scraper[future]
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {
+                    executor.submit(scrape_military_data): 'military',
+                    executor.submit(scrape_news_data): 'news',
+                    executor.submit(scrape_gold_prices): 'gold',
+                    executor.submit(scrape_food_prices): 'food'
+                }
+
+                raw_data = {}
+                for future in as_completed(futures):
+                    data_type = futures[future]
                     try:
-                        data = future.get()
-                        scraped_data[scraper_name] = data
+                        result = future.result()
+                        raw_data[data_type] = result
+                        logging.info(f"[{task_id}] {data_type.title()} data collected successfully")
                     except Exception as exc:
-                        logging.error(f"Scraper '{scraper_name}' generated an exception: {exc}")
-                        scraped_data[scraper_name] = {} # 使用空字典作為後備
+                        logging.error(f"[{task_id}] {data_type.title()} data collection failed: {exc}")
+                        raw_data[data_type] = {"error": str(exc)}
 
             # --- 計算指標 ---
-            raw_data = {
-                "military": scraped_data.get('military', {}),
-                "news": scraped_data.get('news', {}),
-                "gold": scraped_data.get('gold', {}),
-                "food": scraped_data.get('food', {})
-            }
-            indicators = IndicatorCalculator().calculate(raw_data)
-            sources = {
-                'military': scraped_data.get('military', {}).get('source_url'),
-                'gold': scraped_data.get('gold', {}).get('source_url'),
-                'food': scraped_data.get('food', {}).get('source_url'),
-                'news': scraped_data.get('news', {}).get('sources', {})
-            }
-            tasks[task_id]['indicators'] = indicators
-            tasks[task_id]['sources'] = sources
-            logging.info(f"[{task_id}] Phase 1 complete. Indicators calculated.")
+            indicators = calculate_indicators(
+                raw_data.get('military', {}),
+                raw_data.get('news', {}), 
+                raw_data.get('gold', {}),
+                raw_data.get('food', {})
+            )
             
-            # --- 生成 AI 報告 ---
+            overall_threat_level = calculate_threat_probability(indicators)
+            
             logging.info(f"[{task_id}] Phase 2: Generating AI Report...")
             tasks[task_id]['phase'] = 'report'
-            
-            report, chart_data = ReportGenerator().generate_report(indicators)
-            
-            # --- 最終化任務 ---
-            use_credit(user_email)
-            updated_credits = get_remaining_credits(user_email)
 
-            tasks[task_id].update({
-                'status': 'completed',
-                'report': report,
-                'chart_data': chart_data,
-                'updated_credits': updated_credits
-            })
-            logging.info(f"[{task_id}] Task complete. Report generated.")
+            # --- 生成完整報告 ---
+            report = generate_ai_report(
+                military_data=raw_data.get('military', {}),
+                news_data=raw_data.get('news', {}),
+                gold_data=raw_data.get('gold', {}),
+                food_data=raw_data.get('food', {}),
+                military_indicator=indicators.get('military', 0),
+                economic_indicator=indicators.get('economic', 0),
+                overall_threat_level=overall_threat_level
+            )
+
+            # --- 扣除使用者點數 ---
+            deduct_credits(user_email, 1)
+
+            # --- 完成任務 ---
+            tasks[task_id]['status'] = 'completed'
+            tasks[task_id]['threat_level'] = overall_threat_level
+            tasks[task_id]['indicators'] = indicators
+            tasks[task_id]['raw_data'] = raw_data
+            tasks[task_id]['report'] = report
+            tasks[task_id]['timestamp'] = datetime.now().isoformat()
+            
+            logging.info(f"[{task_id}] Task completed successfully")
 
         except Exception as e:
             logging.error(f"Error during analysis task {task_id}: {e}", exc_info=True)
@@ -180,56 +178,6 @@ def run_analysis_task(task_id, user_email):
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-<<<<<<< HEAD
-    # 金鑰現在由 report_generator 自行從 .env 讀取，前端不再需要傳遞或驗證
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return jsonify({"error": "伺服器端未設定 OPENAI_API_KEY。"}), 500
-
-    try:
-        # --- 1. 資料蒐集 ---
-        military_data = scrape_military_data()
-        news_data = scrape_news_data()
-        gold_data = scrape_gold_prices()
-        food_data = scrape_food_prices()
-        
-        raw_data = {
-            "military": military_data,
-            "news": news_data,
-            "gold": gold_data,
-            "food": food_data
-        }
-
-        # --- 2. 指標計算 ---
-        indicators, sources = calculate_indicators(raw_data)
-        threat_probability = calculate_threat_probability(indicators)
-
-        # --- 3. AI 報告生成 ---
-        ai_report = generate_ai_report(indicators, threat_probability, sources, api_key)
-
-        # --- 4. 準備傳送到前端的資料 ---
-        response_data = {
-            "indicators": indicators,
-            "threat_probability": threat_probability,
-            "ai_report": ai_report,
-            "chart_data": {
-                "labels": ["軍事威脅", "經濟穩定", "社會輿情"],
-                "values": [
-                    indicators.get('military_score', 0),
-                    indicators.get('economic_score', 0),
-                    indicators.get('social_sentiment_score', 0)
-                ]
-            },
-            "sources": sources
-        }
-        
-        return jsonify(response_data)
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': f"分析過程中發生嚴重錯誤: {e}"}), 500
-=======
     if 'user_email' not in session:
         return jsonify({'error': '未授權'}), 401
     
@@ -260,7 +208,6 @@ def get_report(task_id):
         return jsonify(task_to_return)
         
     return jsonify(task_result)
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
 
 if __name__ == '__main__':
     print("伺服器已啟動。")
