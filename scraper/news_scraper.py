@@ -4,6 +4,7 @@ from urllib.parse import quote_plus, urljoin
 import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
+import logging
 
 # Google News 基礎 URL
 GOOGLE_NEWS_URL = "https://news.google.com"
@@ -25,75 +26,118 @@ def _search_google_news(query: str) -> List[Dict[str, str]]:
                 continue
 
             link_tag = article_div.find('a', href=True)
-            # 'role' is an attribute, so we search it in attrs
             title_tag = article_div.find('div', attrs={'role': 'heading'})
+            time_tag = article_div.find('time')
+            
+            # 抓取來源資訊
+            source_tag = article_div.find('div', attrs={'data-n-tid': lambda x: x and 'source' in x})
             
             if link_tag and title_tag:
-                # Google News 連結處理
-                href = link_tag['href']
+                # Google News 的連結需要處理
+                href = link_tag.get('href', '')
                 if href.startswith('./'):
-                    href = urljoin(GOOGLE_NEWS_URL, href)
+                    href = href[2:]  # 移除 './'
+                full_url = urljoin(GOOGLE_NEWS_URL, href)
                 
-                articles.append({
-                    'title': title_tag.get_text().strip(),
-                    'url': href
-                })
+                article = {
+                    'title': title_tag.get_text(strip=True),
+                    'url': full_url,
+                    'published_date': time_tag.get('datetime', '') if time_tag else '',
+                    'source': source_tag.get_text(strip=True) if source_tag else '未知來源'
+                }
+                articles.append(article)
         
         return articles
+        
     except Exception as e:
-        print(f"搜尋 '{query}' 時發生錯誤: {e}")
+        logging.warning(f"搜尋 Google 新聞時發生錯誤 (查詢: {query}): {e}")
         return []
 
 def scrape_news_data() -> Dict[str, Any]:
-    """從 Google 新聞搜尋與台海情勢相關的新聞"""
-    print("正在爬取相關新聞...")
+    """
+    從 Google 新聞抓取與中國相關的新聞資料
+    """
+    print("正在從 Google 新聞抓取相關新聞...")
     
-    # 定義關鍵字
-    keywords = {
-        "economic": [
-            "台灣 經濟", "台海 貿易", "兩岸 經濟", "台灣 出口", "半導體"
-        ],
-        "diplomatic": [
-            "台灣 外交", "美台關係", "台日關係", "台歐關係", "國際 台灣"
-        ],
-        "public_opinion": [
-            "台海 民調", "兩岸 民意", "台灣 輿論", "兩岸關係", "台海情勢"
-        ]
-    }
-    
-    all_news = {}
-    all_sources = {}
-    
-    for category, keyword_list in keywords.items():
-        category_news = []
-        category_sources = []
+    try:
+        # 定義搜尋關鍵字
+        economic_keywords = ["中國經濟", "中美貿易", "台海經濟", "兩岸貿易"]
+        diplomatic_keywords = ["中國外交", "兩岸關係", "台海情勢", "中美關係"]
+        opinion_keywords = ["中國輿情", "兩岸民意", "台海局勢", "中國社會"]
         
-        # 隨機選取關鍵字並搜尋
-        selected_keywords = random.sample(keyword_list, min(3, len(keyword_list)))
+        economic_news = []
+        diplomatic_news = []
+        public_opinion_news = []
+        sources = []
         
-        for keyword in selected_keywords:
+        # 搜尋經濟相關新聞
+        for keyword in economic_keywords[:2]:  # 限制搜尋數量避免超時
             articles = _search_google_news(keyword)
-            category_news.extend([article['title'] for article in articles])
-            category_sources.extend([article['url'] for article in articles])
+            economic_news.extend(articles)
+            
+        # 搜尋外交相關新聞
+        for keyword in diplomatic_keywords[:2]:
+            articles = _search_google_news(keyword)
+            diplomatic_news.extend(articles)
+            
+        # 搜尋輿情相關新聞
+        for keyword in opinion_keywords[:2]:
+            articles = _search_google_news(keyword)
+            public_opinion_news.extend(articles)
         
-        # 移除重複並限制數量
-        category_news = list(dict.fromkeys(category_news))[:10]
-        category_sources = list(dict.fromkeys(category_sources))[:10]
+        # 收集所有來源
+        all_articles = economic_news + diplomatic_news + public_opinion_news
+        sources = list(set([article['source'] for article in all_articles if article['source']]))
         
-        all_news[category] = category_news
-        all_sources[category] = category_sources
+        # 如果沒有抓到新聞，提供備用資料
+        if not all_articles:
+            logging.warning("無法從 Google 新聞抓取到任何文章，使用備用資料")
+            return _get_fallback_news_data()
         
-        # 如果沒有取得新聞，使用備用資料
-        if not category_news:
-            all_news[category] = [f"模擬 {category} 新聞標題 1 (備用資料)"]
-            all_sources[category] = [GOOGLE_NEWS_URL]
+        return {
+            "economic_news": economic_news[:5],  # 限制數量
+            "diplomatic_news": diplomatic_news[:5],
+            "public_opinion_news": public_opinion_news[:5],
+            "sources": sources[:10],  # 限制來源數量
+            "total_articles": len(all_articles)
+        }
+        
+    except Exception as e:
+        logging.error(f"抓取新聞資料時發生錯誤: {e}")
+        return _get_fallback_news_data()
 
-    print("新聞爬取完成。")
+def _get_fallback_news_data() -> Dict[str, Any]:
+    """提供備用新聞資料"""
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    fallback_articles = [
+        {
+            'title': '中美貿易關係持續關注中',
+            'url': '#',
+            'published_date': current_time,
+            'source': '財經新聞'
+        },
+        {
+            'title': '兩岸關係發展備受矚目',
+            'url': '#',
+            'published_date': current_time,
+            'source': '政治新聞'
+        },
+        {
+            'title': '台海局勢持續穩定發展',
+            'url': '#',
+            'published_date': current_time,
+            'source': '國際新聞'
+        }
+    ]
+    
     return {
-        "economic_news": all_news.get("economic", []),
-        "diplomatic_news": all_news.get("diplomatic", []),
-        "public_opinion_news": all_news.get("public_opinion", []),
-        "sources": all_sources
+        "economic_news": [fallback_articles[0]],
+        "diplomatic_news": [fallback_articles[1]],
+        "public_opinion_news": [fallback_articles[2]],
+        "sources": ['財經新聞', '政治新聞', '國際新聞'],
+        "total_articles": 3,
+        "error": "Using fallback data"
     }
 
 if __name__ == '__main__':

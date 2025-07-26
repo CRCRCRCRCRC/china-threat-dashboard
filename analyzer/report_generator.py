@@ -1,294 +1,169 @@
 import os
 import openai
-import json
-from dotenv import load_dotenv
-from openai import OpenAI
-<<<<<<< HEAD
-=======
 import logging
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
+from typing import Dict, Any
+from datetime import datetime
 
-# 載入 .env 檔案中的環境變數
-load_dotenv()
-
-# 設定 OpenAI API 金鑰
-# 建議從環境變數讀取，而不是寫死在程式碼中
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    print("錯誤：未設定 OPENAI_API_KEY 環境變數。")
-    # 在實際應用中可能需要引發異常或退出
-    client = None
-else:
-    client = openai.OpenAI(api_key=api_key)
-
-<<<<<<< HEAD
-=======
-class ReportGenerator:
+def generate_ai_report(military_data: Dict[str, Any], 
+                      news_data: Dict[str, Any],
+                      gold_data: Dict[str, Any], 
+                      food_data: Dict[str, Any],
+                      military_indicator: float,
+                      economic_indicator: float,
+                      overall_threat_level: float) -> str:
     """
-    使用 OpenAI GPT-4o 生成分析報告。
+    使用 OpenAI API 生成威脅分析報告
     """
-    def __init__(self):
-        # 檢查並設定 OpenAI API Key
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable not set.")
-        openai.api_key = self.api_key
-
-    def generate_report(self, indicators):
-        """
-        向 OpenAI API 發送請求，生成綜合分析報告，並準備圖表數據。
-        """
-        logging.info("Generating AI analysis report...")
-        
-        threat_level = "低"
-        prob = indicators.get('threat_probability', 0)
-        if prob > 70:
-            threat_level = "高"
-        elif prob > 40:
-            threat_level = "中"
-            
-        system_prompt = f"""
-        你是一位頂尖的軍事安全與國情分析師，專精於分析台灣海峽的緊張局勢。你的任務是根據我提供的量化指標，生成一份專業、客觀、精煉的綜合分析報告。
-
-        報告需包含以下部分：
-        1.  **總體評估**：基於總體威脅機率，用一句話明確指出當前的綜合威脅等級（高、中、低）。
-        2.  **指標分析**：
-            *   **軍事動態**：根據軍事威脅分數，解讀當前解放軍活動的強度。分數越低代表軍事活動越少，局勢越穩定。
-            *   **經濟穩定**：根據經濟穩定分數，評估台灣的經濟韌性。分數越高代表經濟越穩定。
-            *   **社會輿情**：根據社會輿情分數，分析台灣內部的穩定性與民心士氣。分數越高代表社會越穩定。
-        3.  **潛在風險與建議**：根據分數最低的維度，指出當前最主要的風險領域，並提供簡短的觀察或建議。
-        4.  **格式要求**：請使用 Markdown 格式，重點部分使用粗體。用詞需專業、中立。
-        """
-        
-        user_prompt = f"""
-        請根據以下最新指標數據生成分析報告：
-        - **軍事威脅分數**：{indicators.get('military_score', 'N/A')} / 100 (分數越低越安全)
-        - **經濟穩定分數**：{indicators.get('economic_score', 'N/A')} / 100 (分數越高越穩定)
-        - **社會輿情分數**：{indicators.get('social_sentiment_score', 'N/A')} / 100 (分數越高越穩定)
-        - **綜合威脅機率**：{prob}% (機率越高，威脅越大)
-        """
-
-        try:
-            response = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.5,
-                max_tokens=800
-            )
-            report_content = response.choices[0].message.content
-
-            # 準備給前端 Chart.js 的數據
-            chart_data = {
-                'labels': ['軍事威脅', '經濟穩定', '社會輿情'],
-                'data': [
-                    100 - indicators.get('military_score', 50), # 分數反轉，威脅越高數值越大
-                    indicators.get('economic_score', 50),
-                    indicators.get('social_sentiment_score', 50)
-                ]
-            }
-            
-            logging.info("AI report and chart data generated successfully.")
-            return report_content, chart_data
-
-        except Exception as e:
-            logging.error(f"Error generating OpenAI report: {e}")
-            return f"生成AI報告時發生錯誤: {e}", None
-
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
-def _format_sources(sources):
-    """將來源字典格式化為易於閱讀的字串。"""
-    lines = []
-    # 使用一個更有意義的分類名稱對應
-    category_map = {
-        'military': '軍事動態',
-        'economic': '經濟數據',
-        'diplomatic': '外交情資',
-        'public_opinion': '社會輿情'
-    }
-    for category, url_list in sorted(sources.items()):
-        if url_list:
-            display_name = category_map.get(category, category.capitalize())
-            # 使用 set 去除重複的 URL，然後排序以保持一致性
-            unique_urls = sorted(list(set(url_list)))
-            lines.append(f"- {display_name}來源: {', '.join(unique_urls)}")
-    return "\n".join(lines) if lines else "無可用數據來源。"
-
-def _create_prompt(indicators, threat_probability, sources):
-    """根據輸入數據、威脅機率和來源，創建一個詳細的提示給 OpenAI API。"""
     
-    sources_text = _format_sources(sources)
-
-    prompt = f"""
-請扮演一位頂尖、謹慎且客觀的台灣海峽軍事情報分析師。你的任務是根據以下提供的即時數據，生成一份專業、深入、數據驅動的情報分析報告。請避免使用聳動或猜測性的語言，你的所有判斷都必須根植於提供的數據。
-
-報告必須嚴格遵循以下 JSON 格式，不得有任何偏離。所有文字需使用繁體中文。
-
-**JSON 輸出格式:**
-{{
-  "report_summary_zh": {{
-    "title": "臺海局勢綜合情報分析",
-    "sections": [
-      {{
-        "heading": "軍事動態分析",
-        "content": "（根據「軍事數據」，分析解放軍最近活動的規模、頻率與模式。評估這是否為常態性壓力測試、演習的一部分，或具有更不尋常的意圖。思考此活動對台灣防禦能力的潛在消耗。）」
-      }},
-      {{
-        "heading": "經濟指標分析",
-        "content": "（根據「經濟指標」，分析黃金和糧食等避險資產的價格變動，這反映了市場對區域穩定性的信心。思考這些價格波動與軍事活動是否存在潛在關聯，例如資本避險或供應鏈憂慮。）」
-      }},
-      {{
-        "heading": "社會輿情觀察",
-        "content": "（根據「社會輿情新聞」，分析台灣內部對經濟、外交、國防等議題的討論風向。評估公眾情緒是保持穩定，還是受到特定事件或資訊戰的影響而出現波動。）」
-      }}
-    ]
-  }},
-  "report_summary_en": {{
-    "title": "Comprehensive Intelligence Analysis of the Taiwan Strait Situation",
-    "sections": [
-      {{
-        "heading": "Military Dynamics Analysis",
-        "content": "(Based on 'Military Data', analyze the scale, frequency, and patterns of recent PLA activities. Assess whether this constitutes routine pressure testing, part of an exercise, or has more unusual intent. Consider the potential attrition effect on Taiwan's defense capabilities.)"
-      }},
-      {{
-        "heading": "Economic Indicators Analysis",
-        "content": "(Based on 'Economic Indicators,' analyze price changes in safe-haven assets like gold and food, which reflect market confidence in regional stability. Consider potential correlations between these price fluctuations and military activities, such as capital flight or supply chain concerns.)"
-      }},
-      {{
-        "heading": "Public Opinion Observation",
-        "content": "(Based on 'Public Opinion News,' analyze the direction of internal discussions in Taiwan on issues like the economy, diplomacy, and defense. Assess whether public sentiment remains stable or shows volatility influenced by specific events or information warfare.)"
-      }}
-    ]
-  }},
-  "three_month_probability": {{
-    "percentage": "<0-100 的整數>",
-    "justification": "（提供一個詳細、分點的專業理由，解釋你給出的「三個月內」攻台機率。你的判斷必須綜合所有數據，並明確列出你觀察到的【支持攻擊的因素】和【反對攻擊的嚇阻因素】。最後，對如果當前指標持續或升級數週，局勢可能的演變進行簡要推論。）"
-  }},
-  "data_sources_list": {json.dumps(sources, ensure_ascii=False)}
-}}
-
----
-**輸入數據與解讀指引:**
-
-1.  **當前綜合威脅指數 (Current Overall Threat Index):** {threat_probability:.2f}%
-    *   **解讀**: 這是一個量化的短期威脅分數，綜合了軍事、經濟與社會的異常活動。它代表了「當下」的緊張程度，是你判斷的核心基準。
-
-2.  **軍事數據 (Military Data):**
-    - 最新偵獲共機/共艦擾台總數: {indicators.get('military_latest_intrusions', 'N/A')} 架次/艘次
-    *   **解讀**: 數字本身很重要，但更要思考其「趨勢」和「構成」。是戰鬥機、轟炸機還是無人機？這反映了不同的戰術意圖。高強度活動可能意在消耗台灣的應對能力（灰色地帶戰術）。
-
-3.  **經濟指標 (Economic Indicators):**
-    - 黃金價格: {indicators.get('gold_price', 'N/A')}
-    - 黃金價格24小時變動: {indicators.get('gold_price_change', 'N/A')}
-    - 糧食價格: {indicators.get('food_price', 'N/A')}
-    - 糧食價格24小時變動: {indicators.get('food_price_change', 'N/A')}
-    *   **解讀**: 黃金是全球性的避險資產，其價格上漲通常反映市場對地緣政治風險的憂慮。糧食價格則關乎民生穩定與全球供應鏈。劇烈變動可能暗示有大型實體正在為衝突做準備或市場已預期衝突風險升高。
-
-4.  **社會輿情新聞 (Public Opinion News):**
-    - 經濟相關新聞標題: {json.dumps(indicators.get('economic_news_titles', []), ensure_ascii=False)}
-    - 外交相關新聞標題: {json.dumps(indicators.get('diplomatic_news_titles', []), ensure_ascii=False)}
-    - 輿情相關新聞標題: {json.dumps(indicators.get('public_opinion_news_titles', []), ensure_ascii=False)}
-    *   **解讀**: 這些新聞標題反映了台灣社會當前的關注焦點。注意是否有大量關於「民生困難」、「軍事無用論」或「對外關係孤立」的討論，這可能是認知作戰的一部分，旨在削弱內部抵抗意志。
-
-5.  **數據來源 (Data Sources):**
-{sources_text}
----
-
-請嚴格按照上述指示與 JSON 格式進行分析，展現你的專業洞察力。
-"""
-    return prompt.strip()
-
-def generate_ai_report(indicators, threat_probability, sources, api_key):
-    """
-    使用 OpenAI API 生成綜合分析報告。
-    """
+    # 設定 OpenAI API
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return _get_fallback_report("OpenAI API 金鑰未提供。")
-
+        logging.warning("OPENAI_API_KEY 未設定，使用預設報告")
+        return generate_fallback_report(overall_threat_level, military_indicator, economic_indicator)
+    
     try:
-        client = OpenAI(api_key=api_key)
-        print("正在呼叫 OpenAI API (gpt-4o) 進行深度分析...")
-        prompt = _create_prompt(indicators, threat_probability, sources)
+        # 設定 OpenAI 客戶端
+        client = openai.OpenAI(api_key=api_key)
+        
+        # 準備分析資料摘要
+        data_summary = prepare_data_summary(military_data, news_data, gold_data, food_data)
+        
+        # 建構提示詞
+        prompt = f"""
+作為一位專業的地緣政治分析師，請根據以下資料生成一份關於台海情勢的威脅評估報告：
+
+數據摘要：
+{data_summary}
+
+威脅指標：
+- 軍事威脅指標：{military_indicator:.1f}/100
+- 經濟威脅指標：{economic_indicator:.1f}/100
+- 總體威脅等級：{overall_threat_level:.1f}/100
+
+請生成一份專業的分析報告，包含：
+1. 情勢概述
+2. 各項威脅分析
+3. 風險評估
+4. 建議與結論
+
+報告應該客觀、專業，避免過度煽動性言論。長度約 300-500 字。
+"""
+
+        # 呼叫 OpenAI API
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a professional intelligence analyst. Respond strictly in the requested JSON format using Traditional Chinese."},
+                {"role": "system", "content": "你是一位專業的地緣政治分析師，擅長台海情勢分析。"},
                 {"role": "user", "content": prompt}
             ],
-            response_format={"type": "json_object"},
-            temperature=0.5,
+            max_tokens=800,
+            temperature=0.7
         )
         
-        content = response.choices[0].message.content
-        if content:
-            print("API 回應成功。")
-            report_json = json.loads(content)
-            return report_json
-        else:
-            print("API 回應內容為空。")
-            return _get_fallback_report("API 回應內容為空。")
-
-    except openai.APIError as e:
-        print(f"OpenAI API 返回錯誤: {e}")
-        return _get_fallback_report(f"OpenAI API 錯誤: {e}")
-    except json.JSONDecodeError as e:
-        print(f"解析 API 回應時發生 JSON 錯誤: {e}")
-        return _get_fallback_report(f"JSON 解析錯誤: {e}")
+        report = response.choices[0].message.content.strip()
+        logging.info("成功生成 AI 威脅分析報告")
+        return report
+        
     except Exception as e:
-        print(f"生成 AI 報告時發生未知錯誤: {e}")
-        import traceback
-        traceback.print_exc()
-        return _get_fallback_report(f"未知錯誤: {e}")
+        logging.error(f"AI 報告生成失敗: {e}")
+        return generate_fallback_report(overall_threat_level, military_indicator, economic_indicator)
 
-def _get_fallback_report(error_message=""):
-    """返回一個包含錯誤訊息的備用報告結構。"""
-    return {
-        "report_summary_zh": {"title": "報告生成失敗", "sections": [{"heading": "錯誤", "content": f"無法從 OpenAI API 獲取分析報告。{error_message}"}]},
-        "report_summary_en": {"title": "Report Generation Failed", "sections": [{"heading": "Error", "content": f"Failed to retrieve analysis from OpenAI API. {error_message}"}]},
-        "three_month_probability": {"percentage": -1, "justification": f"因報告生成失敗，無法提供機率評估。錯誤：{error_message}"},
-        "data_sources_list": {}
-    }
+def prepare_data_summary(military_data: Dict[str, Any], 
+                        news_data: Dict[str, Any],
+                        gold_data: Dict[str, Any], 
+                        food_data: Dict[str, Any]) -> str:
+    """
+    準備資料摘要供 AI 分析
+    """
+    summary_parts = []
+    
+    # 軍事資料摘要
+    if military_data:
+        total_incursions = military_data.get('total_incursions_last_week', 0)
+        latest_aircrafts = military_data.get('latest_aircrafts', 0)
+        latest_ships = military_data.get('latest_ships', 0)
+        summary_parts.append(
+            f"軍事動態：過去一週共偵獲擾台活動 {total_incursions} 次，"
+            f"最新一日偵獲共機 {latest_aircrafts} 架次、共艦 {latest_ships} 艘次。"
+        )
+    
+    # 經濟資料摘要
+    if gold_data:
+        gold_price = gold_data.get('current_price', 'N/A')
+        gold_change = gold_data.get('daily_change_percent', 0)
+        summary_parts.append(
+            f"黃金價格：目前 ${gold_price}/盎司，日變動 {gold_change:+.2f}%。"
+        )
+    
+    if food_data:
+        food_price = food_data.get('wheat_price', 'N/A')
+        food_change = food_data.get('daily_change_percent', 0)
+        summary_parts.append(
+            f"糧食價格：小麥期貨 ${food_price}/蒲式耳，日變動 {food_change:+.2f}%。"
+        )
+    
+    # 新聞資料摘要
+    if news_data:
+        total_articles = news_data.get('total_articles', 0)
+        summary_parts.append(f"新聞動態：共收集到 {total_articles} 則相關新聞。")
+    
+    return " ".join(summary_parts)
+
+def generate_fallback_report(overall_threat_level: float, 
+                            military_indicator: float, 
+                            economic_indicator: float) -> str:
+    """
+    生成備用報告（當 OpenAI API 不可用時）
+    """
+    current_date = datetime.now().strftime("%Y年%m月%d日")
+    
+    # 根據威脅等級決定基調
+    if overall_threat_level >= 70:
+        threat_level_desc = "高度"
+        situation_desc = "情勢較為緊張"
+    elif overall_threat_level >= 40:
+        threat_level_desc = "中等"
+        situation_desc = "情勢保持關注"
+    else:
+        threat_level_desc = "相對較低"
+        situation_desc = "情勢相對穩定"
+    
+    report = f"""
+台海威脅情勢分析報告 ({current_date})
+
+【情勢概述】
+根據最新收集的多維度資料分析，當前台海地區威脅等級為 {overall_threat_level:.1f}/100，屬於{threat_level_desc}風險水平。整體而言，{situation_desc}。
+
+【威脅分析】
+軍事層面：威脅指標為 {military_indicator:.1f}/100。從最新軍事動態來看，解放軍活動頻率處於監控範圍內，相關單位持續密切觀察中。
+
+經濟層面：威脅指標為 {economic_indicator:.1f}/100。國際經濟環境變化對區域穩定性的影響值得關注，特別是大宗商品價格波動可能反映市場對地緣政治風險的敏感度。
+
+【風險評估】
+綜合各項指標，當前風險主要來自於軍事活動的不確定性以及經濟環境的波動。建議相關單位持續監控各項指標變化，並保持適當的警戒水平。
+
+【建議與結論】
+1. 持續強化情資收集與分析能力
+2. 密切關注國際經濟動向對區域穩定的影響
+3. 加強與友邦的溝通協調機制
+4. 提升民眾對當前情勢的正確認知
+
+本報告基於公開資料分析生成，僅供參考。實際情勢發展請以官方權威發佈為準。
+"""
+    
+    return report.strip()
 
 if __name__ == '__main__':
-    load_dotenv()
-    test_api_key = os.getenv("OPENAI_API_KEY")
-
-    if not test_api_key:
-        print("請在 .env 檔案中設定 OPENAI_API_KEY 以進行測試。")
-    else:
-        # 建立模擬的 indicators 和 sources 字典
-        mock_indicators = {
-            'military_score': 70.0,
-            'military_latest_intrusions': 35,
-            'economic_score': 30.0,
-            'gold_price': '$2350.50',
-            'gold_price_change': '+1.5%',
-            'food_price': '$17.80',
-            'food_price_change': '-0.5%',
-            'social_sentiment_score': 46.67,
-            'economic_news_titles': ["北京宣布對台部分產品啟動貿易壁壘調查"],
-            'diplomatic_news_titles': ["美國重申對台承諾", "某國關閉駐台辦事處"],
-            'public_opinion_news_titles': ["最新民調顯示兩岸關係態度分歧"]
-        }
-        mock_sources = {
-            "military": ["https://www.mnd.gov.tw/"],
-            "economic": [
-                "https://commoditypriceapi.com/",
-                "http://news.google.com/1"
-            ],
-            "diplomatic": [
-                "http://news.google.com/2",
-                "http://news.google.com/3"
-            ],
-            "public_opinion": ["http://news.google.com/4"]
-        }
-        mock_threat_prob = 56.67
-
-        print("\n--- 執行報告生成器測試 ---")
-        ai_report = generate_ai_report(mock_indicators, mock_threat_prob, mock_sources, test_api_key)
-        
-        print("\n--- AI 回應 ---")
-        print(json.dumps(ai_report, indent=2, ensure_ascii=False))
-        print("--- 測試結束 ---")
+    # 測試用的模擬資料
+    test_military_data = {"total_incursions_last_week": 20, "latest_aircrafts": 5, "latest_ships": 2}
+    test_news_data = {"total_articles": 8}
+    test_gold_data = {"current_price": 2000, "daily_change_percent": 1.2}
+    test_food_data = {"wheat_price": 600, "daily_change_percent": -0.5}
+    
+    report = generate_ai_report(
+        test_military_data, test_news_data, test_gold_data, test_food_data,
+        45.0, 25.0, 35.0
+    )
+    
+    print("=== 測試報告 ===")
+    print(report)
