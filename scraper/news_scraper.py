@@ -46,9 +46,9 @@ def _search_google_news(query: str) -> List[Dict[str, str]]:
                     'source': source_tag.get_text(strip=True) if source_tag else '未知來源'
                 }
                 articles.append(article)
-        
+
         return articles
-        
+
     except Exception as e:
         logging.warning(f"搜尋 Google 新聞時發生錯誤 (查詢: {query}): {e}")
         return []
@@ -58,7 +58,7 @@ def scrape_news_data() -> Dict[str, Any]:
     從 Google 新聞抓取與中國相關的新聞資料
     """
     print("正在從 Google 新聞抓取相關新聞...")
-    
+
     try:
         # 定義搜尋關鍵字
         economic_keywords = ["中國經濟", "中美貿易", "台海經濟", "兩岸貿易"]

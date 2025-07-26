@@ -35,8 +35,8 @@ def scrape_military_data() -> Dict[str, Any]:
         rows = content_div.find_all('tr', class_='list_table_text')
         
         total_incursions_last_week = 0
-        latest_aircrafts = 0
-        latest_ships = 0
+            latest_aircrafts = 0
+            latest_ships = 0
         daily_intrusions = []
         
         # 尋找最新的擾台數據
@@ -53,14 +53,14 @@ def scrape_military_data() -> Dict[str, Any]:
                     # 嘗試獲取詳細資料
                     link = title_cell.find('a')
                     if link and link.get('href'):
-                        href = link.get('href')
+                href = link.get('href')
                         
                         # 解析 __doPostBack 參數
                         if '__doPostBack' in href:
                             event_target_match = re.search(r"__doPostBack\('([^']+)'", href)
                             if not event_target_match:
                                 continue
-                            
+                
                             event_target = event_target_match.group(1)
                             
                             # 獲取 ASP.NET 表單參數
@@ -83,25 +83,25 @@ def scrape_military_data() -> Dict[str, Any]:
                             # 發送 POST 請求獲取詳細內容
                             try:
                                 details_response = session.post(MND_URL, headers=HEADERS, data=post_data, timeout=20, verify=False)
-                                details_response.raise_for_status()
-                                
-                                details_soup = BeautifulSoup(details_response.text, 'html.parser')
-                                content_area = details_soup.find('div', class_='ins_p_data') or details_soup
-                                details_page_text = content_area.get_text()
+                details_response.raise_for_status()
+                
+                details_soup = BeautifulSoup(details_response.text, 'html.parser')
+                content_area = details_soup.find('div', class_='ins_p_data') or details_soup
+                details_page_text = content_area.get_text()
 
                                 # 解析軍機和軍艦數量
-                                aircraft_match = re.search(r'偵獲共機(\d+)架次', details_page_text)
-                                ship_match = re.search(r'及共艦(\d+)艘', details_page_text)
-                                
-                                aircrafts_today = int(aircraft_match.group(1)) if aircraft_match else 0
-                                ships_today = int(ship_match.group(1)) if ship_match else 0
-                                
+                aircraft_match = re.search(r'偵獲共機(\d+)架次', details_page_text)
+                ship_match = re.search(r'及共艦(\d+)艘', details_page_text)
+                
+                aircrafts_today = int(aircraft_match.group(1)) if aircraft_match else 0
+                ships_today = int(ship_match.group(1)) if ship_match else 0
+                
                                 # 累加數據
                                 total_incursions_last_week += aircrafts_today + ships_today
                                 if not latest_aircrafts and not latest_ships:  # 保存最新的數據
-                                    latest_aircrafts = aircrafts_today
-                                    latest_ships = ships_today
-                                
+                    latest_aircrafts = aircrafts_today
+                    latest_ships = ships_today
+            
                                 daily_intrusions.append(aircrafts_today + ships_today)
                                 
                             except Exception as detail_error:
@@ -130,7 +130,7 @@ def scrape_military_data() -> Dict[str, Any]:
 
     except Exception as e:
         print(f"爬取軍事資料時發生錯誤: {e}")
-        logging.error(f"爬取軍事資料時發生錯誤: {e}")
+            logging.error(f"爬取軍事資料時發生錯誤: {e}")
         # 返回備用數據
         return {
             "total_incursions_last_week": random.randint(5, 50),
