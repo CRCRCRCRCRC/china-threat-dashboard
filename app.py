@@ -24,6 +24,17 @@ logging.basicConfig(level=logging.INFO)
 # 全域任務儲存
 tasks = {}
 
+# 恢復 try...except 區塊以處理資料庫模組不存在的情況
+with app.app_context():
+    try:
+        from utils.db_helper import init_db
+        init_db()
+        logging.info("資料庫初始化完成 (如果存在)")
+    except ImportError:
+        logging.warning("資料庫模組 'db_helper' 未找到，將在無資料庫模式下運行。")
+    except Exception as e:
+        logging.error(f"資料庫初始化時發生錯誤: {e}")
+
 @app.route('/')
 def index():
     """渲染主頁面"""
@@ -71,7 +82,7 @@ def run_analysis_task(task_id):
             
             logging.info(f"[{task_id}] Phase 2: Generating AI Report...")
             tasks[task_id]['phase'] = 'report'
-
+            
             # --- 生成完整報告 ---
             report = generate_ai_report(
                 military_data=raw_data.get('military', {}),
