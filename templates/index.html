@@ -14,210 +14,84 @@
             <h1>TAIWAN STRAIT DEFENSE MATRIX</h1>
             <p>REAL-TIME PLA ACTIVITY MONITORING & THREAT ASSESSMENT</p>
         </div>
-<<<<<<< HEAD
-=======
-        <div class="user-info">
-            <span>你好，{{ username }}</span>
-            <span>剩餘點數：<span id="user-credits">{{ remaining_credits }}</span></span>
-            <a href="{{ url_for('logout') }}" class="btn btn-logout">登出</a>
-        </div>
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
     </header>
     <div class="container">
         <main>
             <div class="controls">
                 <button id="analyze-button">INITIATE SCAN</button>
             </div>
-
-            <div id="loading-spinner" class="hidden">
-                <div class="spinner"></div>
-                <p>SCANNING PLA ACTIVITIES & CROSS-STRAIT INTELLIGENCE... AI ANALYSIS IN PROGRESS... (1-2 MINUTES)</p>
+            
+            <!-- 威脅指標顯示區 -->
+            <div class="threat-indicators" id="threat-indicators" style="display:none;">
+                <div class="indicator-card">
+                    <h3>軍事威脅指標</h3>
+                    <div class="indicator-value" id="military-indicator">--</div>
+                    <div class="indicator-details" id="military-details">等待分析...</div>
+                </div>
+                <div class="indicator-card">
+                    <h3>經濟威脅指標</h3>
+                    <div class="indicator-value" id="economic-indicator">--</div>
+                    <div class="indicator-details" id="economic-details">等待分析...</div>
+                </div>
+                <div class="indicator-card">
+                    <h3>新聞輿情指標</h3>
+                    <div class="indicator-value" id="news-indicator">--</div>
+                    <div class="indicator-details" id="news-details">等待分析...</div>
+                </div>
             </div>
 
-            <div id="results-container" class="hidden">
-<<<<<<< HEAD
+            <!-- 威脅等級顯示 -->
+            <div class="threat-level" id="threat-level" style="display:none;">
+                <h2>總體威脅等級</h2>
+                <div class="threat-meter">
+                    <div class="threat-value" id="threat-value">--</div>
+                    <div class="threat-description" id="threat-description">準備分析...</div>
+                </div>
+            </div>
+
+            <!-- 載入狀態 -->
+            <div class="loading" id="loading" style="display:none;">
+                <div class="loading-text">正在分析威脅情報...</div>
+                <div class="loading-phase" id="loading-phase">初始化掃描...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- AI 分析報告 -->
+            <div class="analysis-section" id="analysis-section" style="display:none;">
+                <h2>AI 威脅分析報告</h2>
+                <div class="report-content" id="report-content">
+                    等待生成報告...
+                </div>
+            </div>
+
+            <!-- 詳細數據 -->
+            <div class="data-section" id="data-section" style="display:none;">
+                <h2>詳細情報數據</h2>
                 
-                <div class="gauge-container card full-width">
-                     <div class="card-header">
-                        <h3>CURRENT THREAT LEVEL</h3>
-                        <p>HOLOGRAPHIC THREAT ASSESSMENT MATRIX</p>
-=======
-                <!-- Data Cards -->
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-                    <!-- Card: Latest Military Intrusions -->
-                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-semibold text-gray-400 mb-2">最新擾台兵力</h4>
-                        <p id="latest-intrusions" class="text-2xl font-bold text-white">--</p>
-                        <p class="text-xs text-gray-500">架次/艘次</p>
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
+                <div class="data-grid">
+                    <div class="data-card">
+                        <h3>軍事動態</h3>
+                        <div id="military-data">載入中...</div>
                     </div>
-                    <!-- Card: Total Incursions Last Week -->
-                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-semibold text-gray-400 mb-2">近七天擾台總次數</h4>
-                        <p id="total-incursions-week" class="text-2xl font-bold text-white">--</p>
-                        <p class="text-xs text-gray-500">次</p>
+                    
+                    <div class="data-card">
+                        <h3>經濟指標</h3>
+                        <div id="economic-data">載入中...</div>
                     </div>
-<<<<<<< HEAD
-                    <p class="gauge-label">PLA THREAT INDEX BASED ON CROSS-STRAIT MILITARY ACTIVITIES, ECONOMIC INDICATORS & INTELLIGENCE PATTERNS</p>
-                </div>
-
-                <div class="analysis-card card full-width">
-                    <div class="card-header">
-                        <h3>CROSS-STRAIT CONFLICT PROBABILITY</h3>
-                        <p>AI-POWERED PLA INVASION RISK ASSESSMENT</p>
-                    </div>
-                    <div class="threat-pyramid">
-                        <div id="level-5" class="pyramid-layer">
-                            <span class="level-name">CRITICAL ALERT</span>
-                            <span class="level-range">80-100%</span>
-                        </div>
-                        <div id="level-4" class="pyramid-layer">
-                            <span class="level-name">HIGH THREAT</span>
-                            <span class="level-range">60-79%</span>
-                        </div>
-                        <div id="level-3" class="pyramid-layer">
-                            <span class="level-name">ELEVATED</span>
-                            <span class="level-range">40-59%</span>
-                        </div>
-                        <div id="level-2" class="pyramid-layer">
-                            <span class="level-name">GUARDED</span>
-                            <span class="level-range">20-39%</span>
-                        </div>
-                        <div id="level-1" class="pyramid-layer">
-                            <span class="level-name">LOW RISK</span>
-                            <span class="level-range">0-19%</span>
-                        </div>
-                    </div>
-                    <div class="probability-percentage-note">
-                        [AI ASSESSMENT: <span id="three-month-percentage">--</span>%]
-                    </div>
-                    <div class="justification-text">
-                        <h4>STRATEGIC ASSESSMENT:</h4>
-                        <p id="three-month-justification">CLICK "INITIATE SCAN" TO GENERATE PLA THREAT ASSESSMENT.</p>
-                    </div>
-                </div>
-
-                <div class="grid-container">
-                    <div class="data-card card">
-                        <h4>PLA LATEST INCURSION</h4>
-                        <p id="latest-intrusions">--</p>
-                        <span>AIRCRAFT/VESSELS</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>PLA 7-DAY ACTIVITY</h4>
-                        <p id="total-incursions-week">--</p>
-                        <span>TOTAL INCIDENTS</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>INTEL REPORTS</h4>
-                        <p id="total-news-count">--</p>
-                        <span>NEWS ARTICLES</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>GOLD PRICE</h4>
-                        <p id="gold-price">--</p>
-                        <span id="gold-change">--</span>
-                    </div>
-                    <div class="data-card card">
-                        <h4>WHEAT PRICE</h4>
-                        <p id="food-price">--</p>
-                        <span id="food-change">--</span>
-                    </div>
-                </div>
-
-                <div class="card full-width">
-                    <div class="card-header">
-                        <h3 id="report-title-zh">INTELLIGENCE BRIEFING (中文)</h3>
-                    </div>
-                    <div id="report-summary-zh" class="report-section">
-                        <p>CLICK "INITIATE SCAN" TO GENERATE PLA THREAT ASSESSMENT.</p>
-                    </div>
-                     <div class="card-header" style="margin-top: 20px;">
-                        <h3 id="report-title-en">STRATEGIC INTELLIGENCE BRIEFING (ENGLISH)</h3>
-                    </div>
-                    <div id="report-summary-en" class="report-section">
-                        <p>CLICK "INITIATE SCAN" TO GENERATE PLA INVASION RISK ANALYSIS.</p>
-                    </div>
-                </div>
-
-                <div class="chart-grid-single">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>PLA ACTIVITY PATTERN ANALYSIS</h3>
-                            <p>7-DAY CROSS-STRAIT MILITARY MOVEMENT TRACKING</p>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="dailyIncursionsChart"></canvas>
-=======
-                    <!-- Card: Related News Count -->
-                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-semibold text-gray-400 mb-2">相關新聞總數</h4>
-                        <p id="total-news-count" class="text-2xl font-bold text-white">--</p>
-                        <p class="text-xs text-gray-500">篇</p>
-                    </div>
-                    <!-- Card: Gold Price -->
-                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-semibold text-gray-400 mb-2">黃金價格</h4>
-                        <p id="gold-price" class="text-2xl font-bold text-white">--</p>
-                        <p id="gold-change" class="text-xs text-gray-500">--</p>
-                    </div>
-                    <!-- Card: Food Price -->
-                    <div class="card bg-gray-800 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-semibold text-gray-400 mb-2">糧食價格</h4>
-                        <p id="food-price" class="text-2xl font-bold text-white">--</p>
-                        <p id="food-change" class="text-xs text-gray-500">--</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- AI Generated Report -->
-                    <div id="ai-report-container" class="lg:col-span-3 card bg-gray-800 p-6 rounded-lg hidden">
-                        <h4 class="text-lg font-bold text-white mb-4">情報分析報告</h4>
-                        <div class="report-content-grid">
-                            <div class="chart-container">
-                                <canvas id="radar-chart"></canvas>
-                            </div>
-                            <div id="report-content" class="report-text">
-                                <!-- JS will populate this -->
-                            </div>
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
-                        </div>
-                    </div>
-                </div>
-
-<<<<<<< HEAD
-                <div class="card full-width">
-                    <div class="card-header">
-                        <h3>DATA SOURCE MATRIX</h3>
-                        <p>VERIFIED INTELLIGENCE CHANNELS</p>
-                    </div>
-                    <div id="data-sources-container" class="data-sources">
-                         <p>CLICK "INITIATE SCAN" TO LOAD DATA SOURCES.</p>
-=======
-                <!-- Data Sources -->
-                <div class="card bg-gray-800 p-6 rounded-lg mt-6">
-                    <h4 class="text-lg font-bold text-white mb-4">資料來源</h4>
-                    <div id="data-sources-container" class="text-gray-400 text-xs break-all">
-                        <!-- JS will populate this -->
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
+                    
+                    <div class="data-card">
+                        <h3>新聞動態</h3>
+                        <div id="news-data">載入中...</div>
                     </div>
                 </div>
             </div>
         </main>
-
-        <footer>
-            <p>DISCLAIMER: THIS SYSTEM MONITORS OPEN-SOURCE PLA ACTIVITIES FOR ACADEMIC RESEARCH. NOT FOR MILITARY OR OPERATIONAL DECISIONS.</p>
-        </footer>
     </div>
 
-<<<<<<< HEAD
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script src="{{ url_for('static', filename='js/percentage-fix.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/cyber-effects.js') }}"></script>
-=======
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cyber-effects.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/percentage-fix.js') }}"></script>
 </body>
 </html>

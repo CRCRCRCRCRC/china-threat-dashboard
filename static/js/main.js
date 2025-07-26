@@ -1,272 +1,219 @@
 document.addEventListener('DOMContentLoaded', function() {
     const analyzeButton = document.getElementById('analyze-button');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const resultsContainer = document.getElementById('results-container');
-    const aiReportContainer = document.getElementById('ai-report-container');
-    const userCreditsSpan = document.getElementById('user-credits');
-    const reportContentEl = document.getElementById('report-content');
-    const chartCanvas = document.getElementById('radar-chart');
+    const loadingDiv = document.getElementById('loading');
+    const loadingPhase = document.getElementById('loading-phase');
+    const progressFill = document.getElementById('progress-fill');
+    const threatIndicators = document.getElementById('threat-indicators');
+    const threatLevel = document.getElementById('threat-level');
+    const analysisSection = document.getElementById('analysis-section');
+    const dataSection = document.getElementById('data-section');
+    
+    let currentTaskId = null;
+    let progress = 0;
 
-    let radarChartInstance;
+    analyzeButton.addEventListener('click', function() {
+        startAnalysis();
+    });
 
-    if (analyzeButton) {
-        analyzeButton.addEventListener('click', analyze);
-    }
-
-    async function analyze() {
+    function startAnalysis() {
+        // 重置界面
+        hideAllSections();
+        showLoading();
         analyzeButton.disabled = true;
-        loadingSpinner.classList.remove('hidden');
-        resultsContainer.classList.add('hidden');
-        aiReportContainer.classList.add('hidden');
-        resetUI();
-
-        try {
-            const response = await fetch('/analyze', { method: 'POST' });
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: '伺服器回應格式錯誤' }));
-                throw new Error(`分析啟動失敗: ${response.status} - ${errorData.error || '未知錯誤'}`);
+        analyzeButton.textContent = '分析中...';
+        
+        // 開始分析
+        fetch('/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
             }
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
+        })
+        .then(response => response.json())
+        .then(data => {
             if (data.task_id) {
-                pollForReport(data.task_id);
+                currentTaskId = data.task_id;
+                startProgressUpdates();
             } else {
-                throw new Error('未收到分析任務ID');
+                showError('無法啟動分析任務');
             }
-        } catch (error) {
-            console.error('分析請求失敗:', error);
-            showErrorState(error.message);
-        }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('連接錯誤，請稍後再試');
+        });
     }
 
-    function pollForReport(taskId, interval = 3000, maxAttempts = 50) {
-        let attempts = 0;
-        let indicatorsDisplayed = false;
-
-        const intervalId = setInterval(async () => {
-            if (attempts >= maxAttempts) {
-                clearInterval(intervalId);
-                showErrorState("報告生成超時，請稍後重試或檢查伺服器狀態。");
+    function startProgressUpdates() {
+        const interval = setInterval(() => {
+            if (!currentTaskId) {
+                clearInterval(interval);
                 return;
             }
-            try {
-                const response = await fetch(`/get_report/${taskId}`);
-                if (!response.ok) throw new Error(`獲取狀態時伺服器錯誤: ${response.status}`);
-                const result = await response.json();
 
-                if (result.status === 'processing' && !indicatorsDisplayed && result.phase === 'indicators' && result.indicators) {
-                    displayInitialResults(result);
-                    indicatorsDisplayed = true;
-                } else if (result.status === 'completed') {
-                    clearInterval(intervalId);
-                    if (!indicatorsDisplayed) displayInitialResults(result);
-                    displayFinalReport(result);
-                } else if (result.status === 'failed') {
-                    clearInterval(intervalId);
-                    throw new Error(result.report || '報告生成失敗');
-                }
-            } catch (error) {
-                clearInterval(intervalId);
-                console.error('輪詢報告時發生錯誤:', error);
-                showErrorState(`獲取報告失敗：${error.message}`);
-            }
-            attempts++;
-        }, interval);
-    }
-    
-    function resetUI() {
-        if (radarChartInstance) {
-            radarChartInstance.destroy();
-        }
-        reportContentEl.innerHTML = '';
-        resultsContainer.classList.add('hidden');
-        aiReportContainer.classList.add('hidden');
-        updateDataCards({}); 
-    }
-
-    function displayInitialResults(data) {
-        loadingSpinner.classList.add('hidden');
-        resultsContainer.classList.remove('hidden');
-        if (data.indicators) updateDataCards(data.indicators);
-        if (data.sources) updateDataSources(data.sources);
-
-        showAiReportUI("<h4>AI 報告生成中...</h4><p>正在綜合所有數據，請稍候。</p>");
-        aiReportContainer.classList.remove('hidden');
-
-        const cards = resultsContainer.querySelectorAll('.card');
-        cards.forEach((card, index) => {
-            setTimeout(() => card.classList.add('fade-in'), index * 100);
-        });
-    }
-
-<<<<<<< HEAD
-    function updateDataSources(sources) {
-        const container = document.getElementById('data-sources-container');
-        if (!container) return;
-        container.innerHTML = ''; // Clear previous content
-        if (!sources || Object.keys(sources).length === 0) {
-            container.innerHTML = '<p>無可用數據來源。</p>';
-            return;
-        }
-
-        const list = document.createElement('ul');
-        list.className = 'sources-list';
-
-        const categoryMap = {
-            military: '軍事動態',
-            economic: '經濟數據',
-            diplomatic: '外交情資',
-            public_opinion: '社會輿情'
-        };
-
-        // Sort keys to maintain a consistent order
-        const sortedCategories = Object.keys(sources).sort((a, b) => {
-            const order = ['military', 'economic', 'diplomatic', 'public_opinion'];
-            return order.indexOf(a) - order.indexOf(b);
-        });
-
-        for (const category of sortedCategories) {
-            const urls = sources[category];
-            if (urls && urls.length > 0) {
-                const displayName = categoryMap[category] || category.charAt(0).toUpperCase() + category.slice(1);
-                
-                const uniqueUrls = [...new Set(urls)]; // Remove duplicates
-
-                const linksHtml = uniqueUrls.map(url => {
-                    try {
-                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${new URL(url).hostname}</a>`;
-                    } catch (e) {
-                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+            fetch(`/get_report/${currentTaskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateProgress(data);
+                    
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        showResults(data);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        showError(data.report || '分析失敗');
                     }
-                }).join(', ');
+                })
+                .catch(error => {
+                    console.error('Error polling:', error);
+                });
+        }, 2000);
+    }
 
-                const listItem = document.createElement('li');
-                listItem.innerHTML = `<strong>${displayName}:</strong> ${linksHtml}`;
-                list.appendChild(listItem);
-            }
+    function updateProgress(data) {
+        if (data.phase === 'indicators') {
+            loadingPhase.textContent = '正在收集威脅情報...';
+            progress = 30;
+        } else if (data.phase === 'report') {
+            loadingPhase.textContent = '正在生成 AI 分析報告...';
+            progress = 70;
         }
         
-        container.appendChild(list);
-=======
-    function displayFinalReport(data) {
-        if (data.report) showAiReportUI(data.report);
-        if (data.chart_data) renderRadarChart(data.chart_data);
-        if (data.updated_credits !== undefined) {
-            userCreditsSpan.textContent = data.updated_credits;
-            userCreditsSpan.classList.add('highlight-update');
-            setTimeout(() => userCreditsSpan.classList.remove('highlight-update'), 1500);
-        }
-        analyzeButton.disabled = false;
-        loadingSpinner.classList.add('hidden');
->>>>>>> 582f439752d7dd09671e0ddbe1ded2923f47c81d
+        progressFill.style.width = progress + '%';
     }
 
-    function renderRadarChart(chartData) {
-        if (radarChartInstance) {
-            radarChartInstance.destroy();
-        }
-        const ctx = chartCanvas.getContext('2d');
-        radarChartInstance = new Chart(ctx, {
-            type: 'radar',
-            data: {
-                labels: chartData.labels,
-                datasets: [{
-                    label: '威脅指標',
-                    data: chartData.data,
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    r: {
-                        angleLines: { color: 'rgba(255, 255, 255, 0.2)' },
-                        grid: { color: 'rgba(255, 255, 255, 0.2)' },
-                        pointLabels: { color: 'white', font: { size: 14 } },
-                        ticks: {
-                            color: 'white',
-                            backdropColor: 'rgba(0, 0, 0, 0.5)',
-                            stepSize: 25,
-                            beginAtZero: true,
-                            max: 100
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
-    
-    function showErrorState(errorMessage) {
-        loadingSpinner.classList.add('hidden');
-        resultsContainer.classList.remove('hidden');
-        aiReportContainer.classList.remove('hidden');
-        showAiReportUI(`<div class="error-message">${errorMessage}</div>`);
-        analyzeButton.disabled = false;
-    }
-
-    function showAiReportUI(content) {
-        if (reportContentEl) {
-            reportContentEl.innerHTML = marked.parse(content);
-        }
-    }
-
-    function updateDataCards(indicators) {
-        if (!indicators) return;
-        const setCardValue = (id, value, changeId = null, changeValue = null) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value ?? '--';
-            if (changeId && changeValue) {
-                const changeEl = document.getElementById(changeId);
-                if (changeEl) {
-                    changeEl.textContent = changeValue ?? '--';
-                    setChangeColor(changeEl, changeValue);
-                }
-            }
-        };
-
-        setCardValue('latest-intrusions', indicators.military_latest_intrusions);
-        setCardValue('total-incursions-week', indicators.military_total_incursions_last_week);
-        setCardValue('total-news-count', indicators.total_news_count);
-        setCardValue('gold-price', indicators.gold_price, 'gold-change', indicators.gold_price_change);
-        setCardValue('food-price', indicators.food_price, 'food-change', indicators.food_price_change);
-    }
-    
-    function setChangeColor(element, value) {
-        if (!element || typeof value !== 'string') return;
-        element.classList.remove('positive', 'negative');
-        if (value.startsWith('+')) element.classList.add('positive');
-        else if (value.startsWith('-')) element.classList.add('negative');
-    }
-
-    function updateDataSources(sources) {
-        const container = document.getElementById('data-sources-container');
-        if (!container || !sources) return;
-        container.innerHTML = '';
-        const list = document.createElement('ul');
-
-        const createLink = (url) => url && url !== '#' ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${new URL(url).hostname}</a>` : '<span>N/A</span>';
-
-        let listItems = '';
-        if (sources.military) listItems += `<li><strong>軍事動態:</strong> ${createLink(sources.military)}</li>`;
-        if (sources.gold) listItems += `<li><strong>黃金價格:</strong> ${createLink(sources.gold)}</li>`;
-        if (sources.food) listItems += `<li><strong>糧食價格:</strong> ${createLink(sources.food)}</li>`;
-
-        if (sources.news) {
-            const publisherLinks = Object.entries(sources.news)
-                .map(([name, url]) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="source-link">${name}</a>`)
-                .join(', ');
-            if(publisherLinks) listItems += `<li><strong>新聞來源:</strong> ${publisherLinks}</li>`;
+    function showResults(data) {
+        hideLoading();
+        
+        // 顯示威脅指標
+        if (data.indicators) {
+            displayThreatIndicators(data.indicators);
         }
         
-        list.innerHTML = listItems;
-        container.appendChild(list);
+        // 顯示總體威脅等級
+        if (data.threat_level !== undefined) {
+            displayThreatLevel(data.threat_level);
+        }
+        
+        // 顯示 AI 報告
+        if (data.report) {
+            displayAiReport(data.report);
+        }
+        
+        // 顯示詳細數據
+        if (data.raw_data) {
+            displayDetailedData(data.raw_data);
+        }
+        
+        // 重置按鈕
+        analyzeButton.disabled = false;
+        analyzeButton.textContent = 'INITIATE SCAN';
+    }
+
+    function displayThreatIndicators(indicators) {
+        document.getElementById('military-indicator').textContent = indicators.military + '/100';
+        document.getElementById('economic-indicator').textContent = indicators.economic + '/100';
+        document.getElementById('news-indicator').textContent = indicators.news + '/100';
+        
+        document.getElementById('military-details').textContent = getThreatDescription(indicators.military);
+        document.getElementById('economic-details').textContent = getThreatDescription(indicators.economic);
+        document.getElementById('news-details').textContent = getThreatDescription(indicators.news);
+        
+        threatIndicators.style.display = 'block';
+    }
+
+    function displayThreatLevel(threatLevel) {
+        document.getElementById('threat-value').textContent = threatLevel + '%';
+        document.getElementById('threat-description').textContent = getOverallThreatDescription(threatLevel);
+        
+        threatLevel.style.display = 'block';
+    }
+
+    function displayAiReport(report) {
+        document.getElementById('report-content').innerHTML = formatReport(report);
+        analysisSection.style.display = 'block';
+    }
+
+    function displayDetailedData(rawData) {
+        // 軍事數據
+        if (rawData.military) {
+            const militaryHtml = `
+                <p><strong>過去一週擾台次數：</strong>${rawData.military.total_incursions_last_week || 0} 次</p>
+                <p><strong>最新共機：</strong>${rawData.military.latest_aircrafts || 0} 架次</p>
+                <p><strong>最新共艦：</strong>${rawData.military.latest_ships || 0} 艘次</p>
+            `;
+            document.getElementById('military-data').innerHTML = militaryHtml;
+        }
+        
+        // 經濟數據
+        const economicHtml = [];
+        if (rawData.gold) {
+            economicHtml.push(`<p><strong>黃金價格：</strong>$${rawData.gold.current_price || 'N/A'}/oz</p>`);
+            economicHtml.push(`<p><strong>日變動：</strong>${rawData.gold.daily_change_percent || 0}%</p>`);
+        }
+        if (rawData.food) {
+            economicHtml.push(`<p><strong>小麥價格：</strong>$${rawData.food.wheat_price || 'N/A'}/蒲式耳</p>`);
+            economicHtml.push(`<p><strong>日變動：</strong>${rawData.food.daily_change_percent || 0}%</p>`);
+        }
+        document.getElementById('economic-data').innerHTML = economicHtml.join('');
+        
+        // 新聞數據
+        if (rawData.news) {
+            const newsHtml = `
+                <p><strong>總新聞數：</strong>${rawData.news.total_articles || 0} 篇</p>
+                <p><strong>經濟新聞：</strong>${rawData.news.economic_news?.length || 0} 篇</p>
+                <p><strong>外交新聞：</strong>${rawData.news.diplomatic_news?.length || 0} 篇</p>
+                <p><strong>輿情新聞：</strong>${rawData.news.public_opinion_news?.length || 0} 篇</p>
+            `;
+            document.getElementById('news-data').innerHTML = newsHtml;
+        }
+        
+        dataSection.style.display = 'block';
+    }
+
+    function getThreatDescription(score) {
+        if (score >= 80) return '極高威脅';
+        if (score >= 60) return '高威脅';
+        if (score >= 40) return '中等威脅';
+        if (score >= 20) return '低威脅';
+        return '極低威脅';
+    }
+
+    function getOverallThreatDescription(level) {
+        if (level >= 80) return '情勢高度緊張，需要密切關注';
+        if (level >= 60) return '情勢較為緊張，保持警戒';
+        if (level >= 40) return '情勢穩定，持續監控';
+        if (level >= 20) return '情勢相對穩定';
+        return '情勢平靜';
+    }
+
+    function formatReport(report) {
+        // 簡單的文本格式化
+        return report.replace(/\n/g, '<br>').replace(/【([^】]+)】/g, '<h3>$1</h3>');
+    }
+
+    function hideAllSections() {
+        threatIndicators.style.display = 'none';
+        threatLevel.style.display = 'none';
+        analysisSection.style.display = 'none';
+        dataSection.style.display = 'none';
+    }
+
+    function showLoading() {
+        loadingDiv.style.display = 'block';
+        progress = 10;
+        progressFill.style.width = progress + '%';
+        loadingPhase.textContent = '初始化威脅掃描...';
+    }
+
+    function hideLoading() {
+        loadingDiv.style.display = 'none';
+    }
+
+    function showError(message) {
+        hideLoading();
+        alert('錯誤：' + message);
+        analyzeButton.disabled = false;
+        analyzeButton.textContent = 'INITIATE SCAN';
     }
 });
