@@ -1,20 +1,16 @@
 import requests
-import json
-import logging
 import random
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any
+import logging
 
 def scrape_gold_prices_yahoo() -> Dict[str, Any]:
     """
-    使用 Yahoo Finance API 爬取黃金價格 (完全免費，無需 API key)
+    從 Yahoo Finance 抓取黃金價格資料
     """
     try:
-        # Yahoo Finance 的黃金期貨代碼
-        symbol = "GC=F"  # Gold Continuous Contract
-        
-        # Yahoo Finance API endpoint
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F"
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -22,10 +18,10 @@ def scrape_gold_prices_yahoo() -> Dict[str, Any]:
         
         params = {
             'interval': '1d',
-            'range': '5d'
+            'range': '7d'
         }
         
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = requests.get(url, headers=headers, params=params, timeout=15)
         response.raise_for_status()
         
         data = response.json()
@@ -33,16 +29,22 @@ def scrape_gold_prices_yahoo() -> Dict[str, Any]:
         if 'chart' in data and 'result' in data['chart'] and data['chart']['result']:
             result = data['chart']['result'][0]
             
-            # 獲取最新價格
-            current_price = result['meta']['regularMarketPrice']
-            previous_close = result['meta']['previousClose']
-            change = current_price - previous_close
-            change_percent = (change / previous_close) * 100
-            
-            # 獲取歷史價格數據
+            # 獲取價格數據
             timestamps = result['timestamp']
-            quotes = result['indicators']['quote'][0]
-            prices = quotes['close']
+            prices = result['indicators']['quote'][0]['close']
+            
+            # 過濾掉 None 值
+            valid_prices = [p for p in prices if p is not None]
+            
+            if not valid_prices:
+                return None
+                
+            current_price = valid_prices[-1]
+            previous_close = valid_prices[-2] if len(valid_prices) > 1 else current_price
+            
+            # 計算日變化
+            change = current_price - previous_close
+            change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
             
             # 計算7天內的價格變化
             if len(prices) >= 2:
@@ -51,7 +53,7 @@ def scrape_gold_prices_yahoo() -> Dict[str, Any]:
             else:
                 week_change = 0
                 week_change_percent = 0
-            
+                
             return {
                 "current_price": round(current_price, 2),
                 "previous_close": round(previous_close, 2),
@@ -87,7 +89,7 @@ def scrape_gold_prices_backup() -> Dict[str, Any]:
         
         if isinstance(data, list) and len(data) > 0:
             gold_data = data[0]
-            
+                
             return {
                 "current_price": round(float(gold_data.get('price', 0)), 2),
                 "previous_close": round(float(gold_data.get('price', 0)) * 0.999, 2),  # 模擬前收價

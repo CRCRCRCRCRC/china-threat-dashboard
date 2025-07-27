@@ -24,7 +24,7 @@ def calculate_indicators(military_data: Dict[str, Any], news_data: Dict[str, Any
         # 基於價格變動計算經濟不穩定性
         gold_change = gold_data.get('daily_change_percent', 0)
         food_change = food_data.get('daily_change_percent', 0)
-        
+
         # 價格波動越大，經濟威脅越高
         economic_score = min(100, abs(gold_change) * 10 + abs(food_change) * 15)
     

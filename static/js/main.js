@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 重置按鈕
         analyzeButton.disabled = false;
-        analyzeButton.textContent = 'INITIATE SCAN';
+        analyzeButton.textContent = '啟動威脅掃描';
     }
 
     function displayThreatIndicators(indicators) {
@@ -214,6 +214,6 @@ document.addEventListener('DOMContentLoaded', function() {
         hideLoading();
         alert('錯誤：' + message);
         analyzeButton.disabled = false;
-        analyzeButton.textContent = 'INITIATE SCAN';
+        analyzeButton.textContent = '啟動威脅掃描';
     }
 });

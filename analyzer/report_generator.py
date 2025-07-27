@@ -164,6 +164,6 @@ if __name__ == '__main__':
         test_military_data, test_news_data, test_gold_data, test_food_data,
         45.0, 25.0, 35.0
     )
-    
+        
     print("=== 測試報告 ===")
     print(report)
